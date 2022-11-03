@@ -1,0 +1,9 @@
+go 1.18
+
+use (
+	./Data/Group
+	./Data/User
+	./Endpoint/MessengerServiceApi
+	./Endpoint/main
+	./Utils
+)
