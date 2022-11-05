@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	ginsession "github.com/go-session/gin-session"
 	"github.com/gorilla/websocket"
 )
 
@@ -20,6 +21,26 @@ type Message struct {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+}
+
+func GetPage(c *gin.Context) {
+	store := ginsession.FromContext(c)
+	encryptKey, keyError := utils.GenerateRandomAESKey()
+	if keyError == nil {
+		store.Set("key", encryptKey)
+		store.Save()
+	}
+	c.HTML(200, "websockets.html", nil)
+
+}
+
+func GetKey(c *gin.Context) {
+	store := ginsession.FromContext(c)
+	data, ok := store.Get("key")
+	if !ok {
+		c.AbortWithStatus(500)
+	}
+	c.JSON(200, map[string]interface{}{"initialValue": data})
 }
 
 // ConnectToMessengerService Conects the gin server with the WS server,

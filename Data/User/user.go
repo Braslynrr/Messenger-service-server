@@ -1,27 +1,54 @@
 package user
 
+import (
+	"errors"
+	"regexp"
+)
+
 type User struct {
-	number   string
-	zone     string
-	state    string
-	userName string
+	Number   string `bson:"number"`
+	Zone     string `bson:"zone"`
+	State    string `bson:"state"`
+	UserName string `bson:"username"`
+	Password string `bson:"password"`
 }
 
 //NewUser creates a new user, if the parameter is a user which has any golang default property then it will be filled with default values
-func NewUser(user User) *User {
-	newUser := &User{zone: "+000", number: "00000000", state: "Hi! im using Messeger Service", userName: "Username"}
+func NewUser(user User) (*User, error) {
+	newUser := &User{Zone: "+000", Number: "00000000", State: "Hi! im using Messeger Service", UserName: "Username"}
+	var err error = nil
 
-	if user.number != "" {
-		newUser.number = user.number
+	if match, err := regexp.MatchString(`\d{8,}`, user.Number); !match {
+		if err == nil {
+			err = errors.New("Number does not match.")
+		}
+		return nil, err
+	} else {
+		newUser.Number = user.Number
 	}
-	if user.zone != "" {
-		newUser.zone = user.zone
+
+	if match, err := regexp.MatchString(`\+\d{3,}`, user.Zone); !match {
+		if err == nil {
+			err = errors.New("zone does not match.")
+		}
+		return nil, err
+	} else {
+		newUser.Zone = user.Zone
 	}
-	if user.userName != "" {
-		newUser.userName = user.userName
+
+	if user.Password == "" {
+		err = errors.New("Password cant be empty.")
+		return nil, err
+	} else {
+		newUser.Password = user.Password
 	}
-	if user.number != "" {
-		newUser.state = user.state
+
+	if user.UserName != "" {
+		newUser.UserName = user.UserName
 	}
-	return newUser
+	if user.State != "" {
+		newUser.State = user.State
+	}
+
+	return newUser, nil
 }

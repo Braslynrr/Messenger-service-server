@@ -4,6 +4,7 @@
         <title>MesengerService test page</title>
         </head>
     <body>
+        <button onclick="addUser()">Add user</button>
         <pre id="output"></pre>
     </body>
 <script>
@@ -11,6 +12,16 @@
     var socket = new WebSocket("ws://localhost:8080/MessengerService")
     socket.onopen = onOpen
     socket.onmessage= onMessage
+    window.onload = async function(){  
+        let response = await fetch("http://localhost:8080/Key",{
+            method: "Get",
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }})
+        let data = await response.json()
+        output.innerHTML +="my Key for Normal request is" + data.initialValue
+    }  
 
     function onOpen() {
         output.innerHTML += "Status: connected to MessengerService\n";
@@ -20,13 +31,30 @@
         let message = JSON.parse(e.data)
         switch(message.action){
             case "UpdateEncryptKey":
-                output.innerHTML += `My new Key to encrypting is ${JSON.stringify(message.Key)}\n`
+                output.innerHTML += `My new Key to decryptMessages is ${JSON.stringify(message.Key)}\n`
                 break;
             default:
                 output.innerHTML += "Unexpected Message\n"+ JSON.stringify(message)+"\n";
         }
     }
 
+    async function addUser(){
+        let response = await fetch("http://localhost:8080/User",{
+            method: "post",
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+
+            //make sure to serialize your JSON body
+            body: JSON.stringify({
+            zone:"+000",
+            Number: "00000000",
+            password:"paquito"
+            }) })
+            let data = await response.json()
+            alert(data.data)
+    }
 
     function waitForSocketConnection(socket, callback){
         setTimeout(
