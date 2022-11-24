@@ -26,7 +26,7 @@ func main() {
 	go socketioServer.Serve()
 	defer socketioServer.Close()
 
-	router.GET("/socket.io/", gin.WrapH(socketioServer))
-	router.POST("/socket.io/", gin.WrapH(socketioServer))
+	router.GET("/socket.io/*any", gin.WrapH(socketioServer))
+	router.POST("/socket.io/*any", gin.WrapH(socketioServer))
 	router.Run(":8080")
 }

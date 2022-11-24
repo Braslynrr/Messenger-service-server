@@ -14,8 +14,9 @@ type UserManager struct {
 	UserList  map[string]*user.User
 }
 
+// NewUserManger creates a new UserManager
 func NewUserManger() *UserManager {
-	return &UserManager{tokenList: make(map[string]*user.User)}
+	return &UserManager{tokenList: make(map[string]*user.User), UserList: make(map[string]*user.User)}
 }
 
 // InsertUser calls DBservice.InsertUser to insert a user to the DB

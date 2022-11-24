@@ -13,7 +13,7 @@ import (
 	socketio "github.com/googollee/go-socket.io"
 	"github.com/googollee/go-socket.io/engineio"
 	"github.com/googollee/go-socket.io/engineio/transport"
-	"github.com/googollee/go-socket.io/engineio/transport/polling"
+	engineiopooling "github.com/googollee/go-socket.io/engineio/transport/polling"
 )
 
 type Message struct {
@@ -24,15 +24,18 @@ func NewSocketIo() *socketio.Server {
 
 	server := socketio.NewServer(&engineio.Options{
 		Transports: []transport.Transport{
-			&polling.Transport{
+			&engineiopooling.Transport{
 				Client: &http.Client{
-					Timeout: time.Minute,
-				}}}})
+					Timeout: time.Hour,
+				},
+			},
+		},
+	})
 
 	server.OnConnect("/", func(s socketio.Conn) error {
 		s.SetContext("")
-		log.Println("Connected:", s.ID())
-		s.Join("waiting")
+		log.Println("Connected:", s.ID(), s.Namespace())
+
 		return nil
 	})
 
@@ -54,14 +57,15 @@ func NewSocketIo() *socketio.Server {
 	return server
 }
 
-func ConnectToMessengerService(conn socketio.Conn, args string) error {
-	fmt.Println("Aqui ando pa")
+func ConnectToMessengerService(conn socketio.Conn, args Message) error {
 	MS, err := messengermanager.NewMessengerManager()
-	token := fmt.Sprintf("%v", args)
+	token := fmt.Sprintf("%v", args.Info)
 	if user, err := MS.HasTokenAccess(token); err == nil {
 		user.SetSocketID(conn.ID())
 		conn.SetContext(*user)
 		conn.Join("Online")
+		user.Password = ""
+		conn.Emit("Log In", user)
 	}
 	return err
 }
