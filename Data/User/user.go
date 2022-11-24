@@ -11,9 +11,10 @@ type User struct {
 	State    string `bson:"state"`
 	UserName string `bson:"username"`
 	Password string `bson:"password"`
+	socketID string `bson:"-" json:"-"`
 }
 
-//NewUser creates a new user, if the parameter is a user which has any golang default property then it will be filled with default values
+// NewUser creates a new user, if the parameter is a user which has any golang default property then it will be filled with default values
 func NewUser(user User) (*User, error) {
 	newUser := &User{Zone: "+000", Number: "00000000", State: "Hi! im using Messeger Service", UserName: "Username"}
 	var err error = nil
@@ -51,4 +52,21 @@ func NewUser(user User) (*User, error) {
 	}
 
 	return newUser, nil
+}
+
+// IsEqual checks both user are equal by Zone and number
+func (user *User) IsEqual(other *User) bool {
+	return other != nil && user.Zone == other.Zone && user.Number == other.Number
+}
+
+func (user *User) Credentials(other *User) bool {
+	return other != nil && user.Zone == other.Zone && user.Number == other.Number && user.Password == other.Password
+}
+
+func (user *User) SetSocketID(ID string) {
+	user.socketID = ID
+}
+
+func (user *User) GetSocket() string {
+	return user.socketID
 }

@@ -4,74 +4,64 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 )
 
 // EncryptText encrypts a Text using a AES-256 key
-func EncryptText(keystr string, text string) (string, error) {
-	// convert key to bytes
-	key, _ := hex.DecodeString(keystr)
-	plaintext := []byte(text)
+func EncryptText(keystr string, stext string) (_ string, err error) {
+	key := []byte(keystr)
+	text := []byte(stext)
 
-	//Create a new Cipher Block from the key
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
+	c, err := aes.NewCipher(key)
+	gcm, err := cipher.NewGCM(c)
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		panic(err.Error())
 	}
 
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return "", err
-	}
+	result := gcm.Seal(nonce, nonce, text, nil)
 
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
-
-	// convert to base64
-	return base64.URLEncoding.EncodeToString(ciphertext), err
+	return string(result), nil
 }
 
 // DecryptText decrypts a Text using a AES-256 key
-func Decrypt(keystr string, text string) (string, error) {
-	key, _ := hex.DecodeString(keystr)
-	ciphertext, _ := base64.URLEncoding.DecodeString(text)
+func Decrypt(keystr string, text string) (_ string, err error) {
+	ciphertext := []byte(text)
+	key := []byte(keystr)
+	c, err := aes.NewCipher(key)
+	gcm, err := cipher.NewGCM(c)
 
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
+	nonceSize := gcm.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return "", errors.New("ciphertext size is less than nonceSize")
 	}
 
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	if len(ciphertext) < aes.BlockSize {
-		return "", errors.New("ciphertext too short")
-	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 
-	stream := cipher.NewCFBDecrypter(block, iv)
-
-	// XORKeyStream can work in-place if the two arguments are the same.
-	stream.XORKeyStream(ciphertext, ciphertext)
-
-	return fmt.Sprintf("%s", ciphertext), err
+	return string(plaintext), err
 }
 
 //GenerateRandomAESKey generates a Random AES-256 key
 func GenerateRandomAESKey() (string, error) {
 
-	key := make([]byte, 32) //generate a random 32 byte key for AES-256
+	key := make([]byte, 16) //generate a random 32 byte key for AES-256
 	if _, err := rand.Read(key); err != nil {
 		return "", err
 	}
 
 	return hex.EncodeToString(key), nil //convert to string for saving
 
+}
+
+func GenerateToken() (string, error) {
+	token := make([]byte, 4) //generate a token
+	if _, err := rand.Read(token); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(token), nil //convert to string for saving
 }

@@ -5,6 +5,7 @@ import (
 	"MessengerService/user"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"sync"
@@ -31,6 +32,7 @@ var (
 
 var lock = &sync.Mutex{}
 
+// NewDBService creates a unique dbservice instance
 func NewDBService() (*dbService, error) {
 	lock.Lock()
 	defer lock.Unlock()
@@ -53,6 +55,7 @@ func NewDBService() (*dbService, error) {
 	return instance, nil
 }
 
+// connect connects to the DB
 func (dbs *dbService) connect() (err error) {
 
 	dbs.dbcontext, dbs.dbdisconnect = context.WithTimeout(context.Background(), 30*time.Second)
@@ -60,6 +63,7 @@ func (dbs *dbService) connect() (err error) {
 	return
 }
 
+// close disconnects to the DB
 func (dbs *dbService) close() error {
 
 	defer dbs.dbdisconnect()
@@ -77,11 +81,37 @@ func (dbs *dbService) close() error {
 	return nil
 }
 
+// InsertUser calls dbuser.InsertUser to insert a user in the DB
 func (dbs dbService) InsertUser(user user.User) (ok bool, err error) {
+	err = dbs.connect()
+	user2, err2 := dbuser.GetUser(user, dbs.dbclient, dbs.dbcontext)
+
+	if err2 == nil && user.IsEqual(user2) {
+		ok, err = false, errors.New("The User is already registered.")
+	} else if err == nil {
+		ok, err = dbuser.InsertUser(user, dbs.dbclient, dbs.dbcontext)
+		dbs.close()
+	}
+	return
+}
+
+// GetUser gets a user from the DB
+func (dbs dbService) GetUser(localUser user.User) (user *user.User, err error) {
 	err = dbs.connect()
 
 	if err == nil {
-		ok, err = dbuser.InsertUser(user, dbs.dbclient, dbs.dbcontext)
+		user, err = dbuser.GetUser(localUser, dbs.dbclient, dbs.dbcontext)
+		dbs.close()
+	}
+	return
+}
+
+// Login Checks if one user is registed
+func (dbs dbService) Login(localUser user.User) (user *user.User, err error) {
+	err = dbs.connect()
+
+	if err == nil {
+		user, err = dbuser.Login(localUser, dbs.dbclient, dbs.dbcontext)
 		dbs.close()
 	}
 	return

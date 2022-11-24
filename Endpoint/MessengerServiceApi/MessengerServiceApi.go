@@ -1,26 +1,69 @@
 package messengerserviceapi
 
 import (
+	"MessengerService/messengermanager"
 	"MessengerService/utils"
-	"encoding/json"
-	"errors"
 	"fmt"
+	"log"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	ginsession "github.com/go-session/gin-session"
-	"github.com/gorilla/websocket"
+	socketio "github.com/googollee/go-socket.io"
+	"github.com/googollee/go-socket.io/engineio"
+	"github.com/googollee/go-socket.io/engineio/transport"
+	"github.com/googollee/go-socket.io/engineio/transport/polling"
 )
 
 type Message struct {
-	Action string `json:"action"`
-	Info   any    `json:"info"`
+	Info any `json:"info"`
 }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
+func NewSocketIo() *socketio.Server {
+
+	server := socketio.NewServer(&engineio.Options{
+		Transports: []transport.Transport{
+			&polling.Transport{
+				Client: &http.Client{
+					Timeout: time.Minute,
+				}}}})
+
+	server.OnConnect("/", func(s socketio.Conn) error {
+		s.SetContext("")
+		log.Println("Connected:", s.ID())
+		s.Join("waiting")
+		return nil
+	})
+
+	server.OnError("/", func(s socketio.Conn, e error) {
+		fmt.Println("meet error:", e)
+	})
+
+	server.OnDisconnect("/", func(s socketio.Conn, reason string) {
+		log.Println(s.ID(), "closed due to", reason)
+	})
+
+	server.OnEvent("/", "messenger", ConnectToMessengerService)
+
+	server.OnEvent("/", "notice", func(s socketio.Conn, msg string) {
+		fmt.Println("notice:", msg)
+		s.Emit("reply", "have "+msg)
+	})
+
+	return server
+}
+
+func ConnectToMessengerService(conn socketio.Conn, args string) error {
+	fmt.Println("Aqui ando pa")
+	MS, err := messengermanager.NewMessengerManager()
+	token := fmt.Sprintf("%v", args)
+	if user, err := MS.HasTokenAccess(token); err == nil {
+		user.SetSocketID(conn.ID())
+		conn.SetContext(*user)
+		conn.Join("Online")
+	}
+	return err
 }
 
 func GetPage(c *gin.Context) {
@@ -43,47 +86,8 @@ func GetKey(c *gin.Context) {
 	c.JSON(200, map[string]interface{}{"initialValue": data})
 }
 
-// ConnectToMessengerService Conects the gin server with the WS server,
-func ConnectToMessengerService(c *gin.Context) {
+func SocketServer(c *gin.Context) {
 
-	MessengerServiceHandler(c.Writer, c.Request)
-}
+	NewSocketIo().ServeHTTP(c.Writer, c.Request)
 
-//printError prints error to the user
-func printError(connection *websocket.Conn, err error) {
-	connection.WriteJSON(map[string]interface{}{"action": "notify", "status": err})
-}
-
-func MessengerServiceHandler(responseWriter gin.ResponseWriter, request *http.Request) {
-	conn, err := upgrader.Upgrade(responseWriter, request, nil)
-
-	var connected bool = true
-	if err == nil {
-		encryptKey, keyError := utils.GenerateRandomAESKey()
-		conn.WriteJSON(map[string]interface{}{"action": "UpdateEncryptKey", "Key": encryptKey})
-
-		for connected && keyError == nil {
-			// Read message from browser
-			var message Message
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				return
-			}
-			jsonInfo := fmt.Sprintf("%s", msg)
-			value := []byte(jsonInfo)
-			json.Unmarshal(value, &message)
-			message.Action = strings.ToLower(message.Action)
-			switch message.Action {
-			default:
-				printError(conn, errors.New("Action does not exist."))
-			}
-
-		}
-
-		if keyError != nil {
-			printError(conn, errors.New("An Error ocurred while encrypting key was generating."))
-		}
-
-		conn.Close()
-	}
 }

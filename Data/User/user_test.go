@@ -48,3 +48,24 @@ func TestNewUserPasswordFail(t *testing.T) {
 		t.Fatalf("An Exception should be returned")
 	}
 }
+
+//TestIsEqual calls IsEqual checking two users are equal
+func TestIsEqual(t *testing.T) {
+	user1, _ := user.NewUser(user.User{Zone: "+000", Number: "00000000", Password: "123"})
+	user2, _ := user.NewUser(user.User{Zone: "+000", Number: "00000000", Password: "123"})
+
+	if !user1.IsEqual(user2) {
+		t.Fatalf("Both users should be equal. %v1 != %v2", user1, user2)
+	}
+
+	user2.UserName = "Antonio"
+	user2.Password = "paco"
+	if !user1.IsEqual(user2) {
+		t.Fatalf("Both modified users should be equal. %v1 != %v2", user1, user2)
+	}
+
+	user2.Zone = "+001"
+	if user1.IsEqual(user2) {
+		t.Fatalf("Both users should be different. %v1 != %v2", user1, user2)
+	}
+}

@@ -10,15 +10,23 @@ import (
 )
 
 func main() {
+	socketioServer := messengerserviceapi.NewSocketIo()
 	router := gin.Default()
 	router.Use(cors.Default())
 	router.Use(ginsession.New())
 
-	router.GET("/MessengerService", messengerserviceapi.ConnectToMessengerService)
 	router.LoadHTMLFiles("websockets.html")
-	router.GET("/", messengerserviceapi.GetPage)
+	router.GET("/", func(c *gin.Context) {
+		c.HTML(200, "websockets.html", nil)
+	})
 	router.GET("/Key", messengerserviceapi.GetKey)
 	router.POST("/User", userserviceapi.NewUser)
+	router.POST("/User/Login", userserviceapi.Login)
 
-	router.Run("localhost:8080")
+	go socketioServer.Serve()
+	defer socketioServer.Close()
+
+	router.GET("/socket.io/", gin.WrapH(socketioServer))
+	router.POST("/socket.io/", gin.WrapH(socketioServer))
+	router.Run(":8080")
 }
