@@ -3,7 +3,12 @@ go 1.18
 use (
 	./Data/Group
 	./Data/User
+	./DataBase/DBService
+	./DataBase/DBUser
 	./Endpoint/MessengerServiceApi
+	./Endpoint/UserServiceApi
 	./Endpoint/main
+	./Logic/MessengerManager
+	./Logic/UserManager
 	./Utils
 )

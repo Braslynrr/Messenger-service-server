@@ -1,11 +1,11 @@
-module MessengerService/main
+module MessengerService/userserviceapi
 
 go 1.18
 
 require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-session/gin-session v3.1.0+incompatible
-	github.com/rs/cors/wrapper/gin v0.0.0-20221003140808-fcebdb403f4d
+	github.com/gorilla/websocket v1.5.0
 )
 
 require (
@@ -21,7 +21,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
-	github.com/rs/cors v1.8.2 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect

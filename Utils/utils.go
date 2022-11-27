@@ -6,72 +6,85 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
-	"fmt"
-	"io"
+
+	"github.com/zenazn/pkcs7pad"
 )
 
-// EncryptText encrypts a Text using a AES-256 key
-func EncryptText(keystr string, text string) (string, error) {
-	// convert key to bytes
-	key, _ := hex.DecodeString(keystr)
-	plaintext := []byte(text)
+const iv = "fb4c5e213749eddadf1e22d723eaf207"
 
-	//Create a new Cipher Block from the key
+var IV, _ = hex.DecodeString(iv)
+
+// encrypt_aes_cbc encrypts AES CBC with pkcs7 padding
+func encrypt_aes_cbc(plain, key []byte) (encrypted []byte, err error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", err
+		return encrypted, err
 	}
+	blockSize := block.BlockSize()
+	origData := pkcs7pad.Pad(plain, blockSize)
 
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return "", err
-	}
-
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
-
-	// convert to base64
-	return base64.URLEncoding.EncodeToString(ciphertext), err
+	encrypted = make([]byte, len(origData))
+	stream := cipher.NewCBCEncrypter(block, IV)
+	stream.CryptBlocks(encrypted, origData)
+	return
 }
 
-// DecryptText decrypts a Text using a AES-256 key
-func Decrypt(keystr string, text string) (string, error) {
-	key, _ := hex.DecodeString(keystr)
-	ciphertext, _ := base64.URLEncoding.DecodeString(text)
-
+// decrypt_aes_cbc decrypt aes cbc with pkcs7 padding
+func decrypt_aes_cbc(encrypted, key []byte) (origData []byte, err error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", err
+		return encrypted, err
 	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	if len(ciphertext) < aes.BlockSize {
-		return "", errors.New("ciphertext too short")
-	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
-
-	stream := cipher.NewCFBDecrypter(block, iv)
-
-	// XORKeyStream can work in-place if the two arguments are the same.
-	stream.XORKeyStream(ciphertext, ciphertext)
-
-	return fmt.Sprintf("%s", ciphertext), err
+	plain := make([]byte, len(encrypted))
+	stream := cipher.NewCBCDecrypter(block, IV)
+	stream.CryptBlocks(plain, encrypted)
+	origData, err = pkcs7pad.Unpad(plain)
+	return
 }
 
-//GenerateRandomAESKey generates a Random AES-256 key
-func GenerateRandomAESKey() (string, error) {
+// GenerateRandomAESKey generates a Random AES key
+func GenerateRandomAESKey(size int) (string, error) {
 
-	key := make([]byte, 32) //generate a random 32 byte key for AES-256
+	key := make([]byte, size) //generate a random key for AES
 	if _, err := rand.Read(key); err != nil {
 		return "", err
 	}
 
 	return hex.EncodeToString(key), nil //convert to string for saving
+}
 
+// GenerateToken generates a random token
+func GenerateToken() (string, error) {
+	token := make([]byte, 4) //generate a token
+	if _, err := rand.Read(token); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(token), nil //convert to string for saving
+}
+
+// DecryptText decrypts text using AES CBC PKC7
+func DecryptText(encodedtext string, key string) (string, error) {
+	keyInBytes, err := hex.DecodeString(key)
+	if err != nil {
+		return "", err
+	}
+	text, err := base64.StdEncoding.DecodeString(encodedtext)
+	if err != nil {
+		return "", err
+	}
+	plain, err := decrypt_aes_cbc(text, keyInBytes)
+	return string(plain), err
+}
+
+// EncryptText Encrypt text using AES CBC PKC7
+func EncryptText(text string, key string) (string, error) {
+	keyInBytes, err := hex.DecodeString(key)
+	if err != nil {
+		return "", err
+	}
+	plaintext := []byte(text)
+	encryptedText, err := encrypt_aes_cbc(plaintext, keyInBytes)
+	base64Text := base64.StdEncoding.EncodeToString(encryptedText)
+	return base64Text, err
 }
