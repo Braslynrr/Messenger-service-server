@@ -13,7 +13,7 @@ func TestNewUser(t *testing.T) {
 	}
 }
 
-//TestNewUserNumberFail calls NewUser checking a Number property raise a exception
+// TestNewUserNumberFail calls NewUser checking a Number property raise a exception
 func TestNewUserNumberFail(t *testing.T) {
 	user1, err := user.NewUser(user.User{Zone: "+000", Number: "00000l00", Password: "123"})
 	if user1 != nil {
@@ -25,7 +25,7 @@ func TestNewUserNumberFail(t *testing.T) {
 	}
 }
 
-//TestNewUserZoneFail calls NewUser checking a Zone property raise a exception
+// TestNewUserZoneFail calls NewUser checking a Zone property raise a exception
 func TestNewUserZoneFail(t *testing.T) {
 	user1, err := user.NewUser(user.User{Zone: "+0l0", Number: "00000000", Password: "123"})
 	if user1 != nil {
@@ -37,7 +37,7 @@ func TestNewUserZoneFail(t *testing.T) {
 	}
 }
 
-//TestNewUserPasswordFail calls NewUser checking a Password property raise a exception
+// TestNewUserPasswordFail calls NewUser checking a Password property raise a exception
 func TestNewUserPasswordFail(t *testing.T) {
 	user1, err := user.NewUser(user.User{Zone: "+000", Number: "00000000"})
 	if user1 != nil {
@@ -49,7 +49,7 @@ func TestNewUserPasswordFail(t *testing.T) {
 	}
 }
 
-//TestIsEqual calls IsEqual checking two users are equal
+// TestIsEqual calls IsEqual checking two users are equal
 func TestIsEqual(t *testing.T) {
 	user1, _ := user.NewUser(user.User{Zone: "+000", Number: "00000000", Password: "123"})
 	user2, _ := user.NewUser(user.User{Zone: "+000", Number: "00000000", Password: "123"})
@@ -67,5 +67,15 @@ func TestIsEqual(t *testing.T) {
 	user2.Zone = "+001"
 	if user1.IsEqual(user2) {
 		t.Fatalf("Both users should be different. %v1 != %v2", user1, user2)
+	}
+}
+
+// TestCredentials calls credentials checking equality.
+func TestCredentials(t *testing.T) {
+	user1, _ := user.NewUser(user.User{Zone: "+000", Number: "00000000", Password: "123"})
+	user2, _ := user.NewUser(user.User{Zone: "+000", Number: "00000000", Password: "123"})
+
+	if !user1.Credentials(user2) {
+		t.Fatalf("Password, zone and number from user1 and user2 should be alike. %v == %v", user1, user2)
 	}
 }

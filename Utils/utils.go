@@ -4,59 +4,56 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
-	"errors"
-	"io"
+
+	"github.com/zenazn/pkcs7pad"
 )
 
-// EncryptText encrypts a Text using a AES-256 key
-func EncryptText(keystr string, stext string) (_ string, err error) {
-	key := []byte(keystr)
-	text := []byte(stext)
+const iv = "fb4c5e213749eddadf1e22d723eaf207"
 
-	c, err := aes.NewCipher(key)
-	gcm, err := cipher.NewGCM(c)
+var IV, _ = hex.DecodeString(iv)
 
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		panic(err.Error())
+// encrypt_aes_cbc encrypts AES CBC with pkcs7 padding
+func encrypt_aes_cbc(plain, key []byte) (encrypted []byte, err error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return encrypted, err
 	}
+	blockSize := block.BlockSize()
+	origData := pkcs7pad.Pad(plain, blockSize)
 
-	result := gcm.Seal(nonce, nonce, text, nil)
-
-	return string(result), nil
+	encrypted = make([]byte, len(origData))
+	stream := cipher.NewCBCEncrypter(block, IV)
+	stream.CryptBlocks(encrypted, origData)
+	return
 }
 
-// DecryptText decrypts a Text using a AES-256 key
-func Decrypt(keystr string, text string) (_ string, err error) {
-	ciphertext := []byte(text)
-	key := []byte(keystr)
-	c, err := aes.NewCipher(key)
-	gcm, err := cipher.NewGCM(c)
-
-	nonceSize := gcm.NonceSize()
-	if len(ciphertext) < nonceSize {
-		return "", errors.New("ciphertext size is less than nonceSize")
+// decrypt_aes_cbc decrypt aes cbc with pkcs7 padding
+func decrypt_aes_cbc(encrypted, key []byte) (origData []byte, err error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return encrypted, err
 	}
-
-	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
-
-	return string(plaintext), err
+	plain := make([]byte, len(encrypted))
+	stream := cipher.NewCBCDecrypter(block, IV)
+	stream.CryptBlocks(plain, encrypted)
+	origData, err = pkcs7pad.Unpad(plain)
+	return
 }
 
-//GenerateRandomAESKey generates a Random AES-256 key
-func GenerateRandomAESKey() (string, error) {
+// GenerateRandomAESKey generates a Random AES key
+func GenerateRandomAESKey(size int) (string, error) {
 
-	key := make([]byte, 16) //generate a random 32 byte key for AES-256
+	key := make([]byte, size) //generate a random key for AES
 	if _, err := rand.Read(key); err != nil {
 		return "", err
 	}
 
 	return hex.EncodeToString(key), nil //convert to string for saving
-
 }
 
+// GenerateToken generates a random token
 func GenerateToken() (string, error) {
 	token := make([]byte, 4) //generate a token
 	if _, err := rand.Read(token); err != nil {
@@ -64,4 +61,30 @@ func GenerateToken() (string, error) {
 	}
 
 	return hex.EncodeToString(token), nil //convert to string for saving
+}
+
+// DecryptText decrypts text using AES CBC PKC7
+func DecryptText(encodedtext string, key string) (string, error) {
+	keyInBytes, err := hex.DecodeString(key)
+	if err != nil {
+		return "", err
+	}
+	text, err := base64.StdEncoding.DecodeString(encodedtext)
+	if err != nil {
+		return "", err
+	}
+	plain, err := decrypt_aes_cbc(text, keyInBytes)
+	return string(plain), err
+}
+
+// EncryptText Encrypt text using AES CBC PKC7
+func EncryptText(text string, key string) (string, error) {
+	keyInBytes, err := hex.DecodeString(key)
+	if err != nil {
+		return "", err
+	}
+	plaintext := []byte(text)
+	encryptedText, err := encrypt_aes_cbc(plaintext, keyInBytes)
+	base64Text := base64.StdEncoding.EncodeToString(encryptedText)
+	return base64Text, err
 }

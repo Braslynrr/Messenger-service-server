@@ -9,10 +9,12 @@
         <button onclick="connect()">Connect</button>
         <pre id="output"></pre>
     </body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/rollups/aes.js"></script>
+    <script src="https://cdn.rawgit.com/CryptoStore/crypto-js/3.1.2/build/rollups/aes.js"></script>
     <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
     
 <script>
+    const base64_iv  = 'fb4c5e213749eddadf1e22d723eaf207';
+    let iv  = CryptoJS.enc.Hex.parse(base64_iv);
     var output = document.getElementById("output");
     var socket = io();
     var s2 = io("/");
@@ -28,6 +30,16 @@
         output.innerHTML+= `I'm ${JSON.stringify(user)}\n`
    })
 
+   socket.on("error",function(error){
+        if('error' in error){
+            output.innerHTML+= `I received a new server error: ${JSON.stringify(error.error)}\n`
+        }else{
+            output.innerHTML+= `I received a Connection error: ${JSON.stringify(error)}\n`
+        }
+       
+   })
+
+
     window.onload = async function(){  
         let response = await fetch("http://localhost:8080/Key",{
             method: "Get",
@@ -37,7 +49,7 @@
             }})
         let data = await response.json()
         output.innerHTML +="my Key for Normal request is" + data.initialValue+"\n"
-        generalKey=data.initialValue
+        generalKey= CryptoJS.enc.Hex.parse(data.initialValue)
     }  
 
 
@@ -60,18 +72,31 @@
     }
 
     async function login(){
+
+        var password = CryptoJS.AES.encrypt('Br4zz4',
+                                            generalKey,
+                                            { iv: iv,
+                                              mode: CryptoJS.mode.CBC,
+                                              padding: CryptoJS.pad.Pkcs7})
+
+        temp_password= password.toString()
+        //var plain = CryptoJS.AES.decrypt(passowrd.toString(),generalKey,
+        //                                    { iv: iv,
+        //                                      mode: CryptoJS.mode.CBC,
+        //                                      padding: CryptoJS.pad.Pkcs7})
+
+
         let response = await fetch("http://localhost:8080/User/Login",{
             method: "post",
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-
             //make sure to serialize your JSON body
             body: JSON.stringify({
             zone:"+506",
             number: "60032274",
-            password:"Br4zz4",
+            password: temp_password,
             username:"Brazza"
             }) })
         let data = await response.json()
@@ -86,18 +111,6 @@
     function connect(){
         s2.emit("messenger",{info:token})
     }
-
-    function encryptMessage(messageToencrypt = '', secretkey = '')
-    {         
-        var encryptedMessage = CryptoJS.AES.encrypt(messageToencrypt, secretkey);
-        return encryptedMessage.toString();       
-    }
-
-    function decryptMessage(encryptedMessage = '', secretkey = ''){
-        var decryptedBytes = CryptoJS.AES.decrypt(encryptedMessage, secretkey);         
-        var decryptedMessage = decryptedBytes.toString(CryptoJS.enc.Utf8);          
-        return decryptedMessage;       
-    } 
 
 </script>
 </html>

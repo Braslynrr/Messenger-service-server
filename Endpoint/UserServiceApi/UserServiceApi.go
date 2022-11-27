@@ -3,9 +3,12 @@ package userserviceapi
 import (
 	"MessengerService/messengermanager"
 	"MessengerService/user"
+	"MessengerService/utils"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	ginsession "github.com/go-session/gin-session"
 	"github.com/gorilla/websocket"
 )
 
@@ -55,13 +58,21 @@ func Login(c *gin.Context) {
 
 		if mmerr == nil {
 
-			token, err = messman.Login(*tempUser)
+			store := ginsession.FromContext(c)
+			key, _ := store.Get("key")
+			tempUser.Password, err = utils.DecryptText(tempUser.Password, fmt.Sprint(key))
 
 			if err == nil {
 
-				c.IndentedJSON(http.StatusOK, gin.H{"token": token})
-				return
+				token, err = messman.Login(*tempUser)
+
+				if err == nil {
+
+					c.IndentedJSON(http.StatusOK, gin.H{"token": token})
+					return
+				}
 			}
+
 		} else {
 			err = mmerr
 		}
@@ -76,5 +87,3 @@ func ConnectUser(token string, conn *websocket.Conn, encryptKey string) error {
 	}
 	return err
 }
-
-//err := json.Unmarshal([]byte(fmt.Sprintf("%v", info)), &user)

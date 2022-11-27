@@ -16,9 +16,7 @@ func main() {
 	router.Use(ginsession.New())
 
 	router.LoadHTMLFiles("websockets.html")
-	router.GET("/", func(c *gin.Context) {
-		c.HTML(200, "websockets.html", nil)
-	})
+	router.GET("/", messengerserviceapi.GetPage)
 	router.GET("/Key", messengerserviceapi.GetKey)
 	router.POST("/User", userserviceapi.NewUser)
 	router.POST("/User/Login", userserviceapi.Login)

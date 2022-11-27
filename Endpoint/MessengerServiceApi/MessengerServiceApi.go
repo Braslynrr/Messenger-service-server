@@ -16,6 +16,8 @@ import (
 	engineiopooling "github.com/googollee/go-socket.io/engineio/transport/polling"
 )
 
+const standarKeySize = 16
+
 type Message struct {
 	Info any `json:"info"`
 }
@@ -33,7 +35,9 @@ func NewSocketIo() *socketio.Server {
 	})
 
 	server.OnConnect("/", func(s socketio.Conn) error {
-		s.SetContext("")
+		key, err := utils.GenerateRandomAESKey(standarKeySize)
+		HandleError(s, "", err)
+		s.SetContext(key)
 		log.Println("Connected:", s.ID(), s.Namespace())
 
 		return nil
@@ -49,30 +53,38 @@ func NewSocketIo() *socketio.Server {
 
 	server.OnEvent("/", "messenger", ConnectToMessengerService)
 
-	server.OnEvent("/", "notice", func(s socketio.Conn, msg string) {
-		fmt.Println("notice:", msg)
-		s.Emit("reply", "have "+msg)
-	})
-
 	return server
 }
 
-func ConnectToMessengerService(conn socketio.Conn, args Message) error {
-	MS, err := messengermanager.NewMessengerManager()
-	token := fmt.Sprintf("%v", args.Info)
-	if user, err := MS.HasTokenAccess(token); err == nil {
-		user.SetSocketID(conn.ID())
-		conn.SetContext(*user)
-		conn.Join("Online")
-		user.Password = ""
-		conn.Emit("Log In", user)
+// HandleError handles erros using a type and error
+func HandleError(conn socketio.Conn, errortype string, err error) {
+	if err != nil {
+		conn.Emit(fmt.Sprintf("error%v", errortype), gin.H{"error": err.Error()})
 	}
-	return err
 }
 
+// ConnectToMessengerService connects a user to Online channel using a token
+func ConnectToMessengerService(conn socketio.Conn, args Message) {
+	MS, err := messengermanager.NewMessengerManager()
+	token := fmt.Sprintf("%v", args.Info)
+	user, err := MS.HasTokenAccess(token)
+	if err == nil {
+		AESkey := fmt.Sprintf("%v", conn.Context())
+		//user.Password, err = utils.EncryptText(AESkey, user.Password)
+		user.SetSocketID(conn.ID())
+		conn.SetContext(gin.H{"key": AESkey, "user": *user})
+		conn.Join("Online")
+		conn.Emit("Log In", user)
+		// return all user information
+		return
+	}
+	HandleError(conn, "", err)
+}
+
+// GetPage Return the Test page
 func GetPage(c *gin.Context) {
 	store := ginsession.FromContext(c)
-	encryptKey, keyError := utils.GenerateRandomAESKey()
+	encryptKey, keyError := utils.GenerateRandomAESKey(16)
 	if keyError == nil {
 		store.Set("key", encryptKey)
 		store.Save()
@@ -81,6 +93,7 @@ func GetPage(c *gin.Context) {
 
 }
 
+// returns a key generated on GetPage
 func GetKey(c *gin.Context) {
 	store := ginsession.FromContext(c)
 	data, ok := store.Get("key")
