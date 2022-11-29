@@ -7,7 +7,7 @@ import (
 
 type Group struct {
 	Members     []*user.User
-	Name        string
+	GroupName   string
 	Description string
 	IsChat      bool
 	Admins      []*user.User
@@ -16,9 +16,8 @@ type Group struct {
 // NewGroup creates a new Group, 2 members are needed
 func NewGroup(users ...*user.User) (newGroup *Group, err error) {
 
-	newGroup = &Group{Members: make([]*user.User, 0)}
+	newGroup = &Group{Members: make([]*user.User, 0), IsChat: true}
 	err = nil
-
 	for _, user := range users {
 		if newGroup.Admins == nil {
 			newGroup.Admins = append(newGroup.Admins, user)
@@ -29,6 +28,8 @@ func NewGroup(users ...*user.User) (newGroup *Group, err error) {
 	if len(newGroup.Members) < 2 {
 		newGroup = nil
 		err = errors.New("There aren't enough users")
+	} else if len(newGroup.Members) > 3 {
+		newGroup.IsChat = false
 	}
 	return newGroup, err
 }

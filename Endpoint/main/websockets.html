@@ -7,38 +7,21 @@
         <button onclick="addUser()">Add user</button>
         <button onclick="login()">Login</button>
         <button onclick="connect()">Connect</button>
+        <button onclick="sendMessage()">Send Message</button>
         <pre id="output"></pre>
     </body>
     <script src="https://cdn.rawgit.com/CryptoStore/crypto-js/3.1.2/build/rollups/aes.js"></script>
-    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.5.0/socket.io.js"></script>
     
 <script>
     const base64_iv  = 'fb4c5e213749eddadf1e22d723eaf207';
     let iv  = CryptoJS.enc.Hex.parse(base64_iv);
     var output = document.getElementById("output");
-    var socket = io();
-    var s2 = io("/");
+    var socket =  io();
+    var localUser = null
     var token=""
     var generalKey = ""
     var WSKey = ""
-
-    socket.on('connect', function(){ 
-        output.innerHTML+=`Now Im Connected\n`
-   });
-
-   socket.on("Log In",function(user){
-        output.innerHTML+= `I'm ${JSON.stringify(user)}\n`
-   })
-
-   socket.on("error",function(error){
-        if('error' in error){
-            output.innerHTML+= `I received a new server error: ${JSON.stringify(error.error)}\n`
-        }else{
-            output.innerHTML+= `I received a Connection error: ${JSON.stringify(error)}\n`
-        }
-       
-   })
-
 
     window.onload = async function(){  
         let response = await fetch("http://localhost:8080/Key",{
@@ -52,8 +35,50 @@
         generalKey= CryptoJS.enc.Hex.parse(data.initialValue)
     }  
 
+    socket.on('connect', function(){ 
+            output.innerHTML+=`Now Im Connected\n`
+         });
+
+    socket.on("Log In",function(encryptedUser){ 
+            var plain = CryptoJS.AES.decrypt(encryptedUser,WSKey,
+                                            { iv: iv,
+                                                mode: CryptoJS.mode.CBC,
+                                                padding: CryptoJS.pad.Pkcs7})
+            user = JSON.parse(plain.toString(CryptoJS.enc.Utf8))
+            localUser = user
+            output.innerHTML+= `I'm ${JSON.stringify(localUser)}\n`
+    })
+
+    socket.on("WSKey",function(key){
+            WSKey= CryptoJS.enc.Hex.parse(key)
+            output.innerHTML+=`My key to Handle encrypted messages is ${key}\n`
+    })
+
+    socket.on("error",function(error){
+            if('error' in error){
+                output.innerHTML+= `I received a new server error: ${JSON.stringify(error.error)}\n`
+            }else{
+                output.innerHTML+= `I received a Connection error: ${JSON.stringify(error)}\n`
+            }
+        
+    })
 
     async function addUser(){
+        let user = JSON.stringify({
+            zone:"+506",
+            number: "62073447",
+            password: "ponchoj113",
+            username:"poncho"
+            })
+        let encryptedUser = CryptoJS.AES.encrypt(user,
+                                            generalKey,
+                                            { iv: iv,
+                                              mode: CryptoJS.mode.CBC,
+                                              padding: CryptoJS.pad.Pkcs7})
+
+        temp_encryptedUser = encryptedUser.toString()
+
+
         let response = await fetch("http://localhost:8080/User",{
             method: "post",
             headers: {
@@ -63,28 +88,30 @@
 
             //make sure to serialize your JSON body
             body: JSON.stringify({
-            zone:"+506",
-            number: "60032274",
-            password:"Br4zz4",
-            username:"Brazza"
+                user: temp_encryptedUser
             }) })
-            let data = await response.json()
+            
+        if(response.status==200){
+            output.innerHTML +=`User added`
+        }else{
+            output.innerHTML +=response.statusText
+        }
     }
 
     async function login(){
-
-        var password = CryptoJS.AES.encrypt('Br4zz4',
+        let user = JSON.stringify({
+            zone:"+506",
+            number: "60032274",
+            password: "Br4zz4",
+            username:"Brazza"
+            })
+        let encryptedUser = CryptoJS.AES.encrypt(user,
                                             generalKey,
                                             { iv: iv,
                                               mode: CryptoJS.mode.CBC,
                                               padding: CryptoJS.pad.Pkcs7})
 
-        temp_password= password.toString()
-        //var plain = CryptoJS.AES.decrypt(passowrd.toString(),generalKey,
-        //                                    { iv: iv,
-        //                                      mode: CryptoJS.mode.CBC,
-        //                                      padding: CryptoJS.pad.Pkcs7})
-
+        temp_encryptedUser = encryptedUser.toString()
 
         let response = await fetch("http://localhost:8080/User/Login",{
             method: "post",
@@ -93,12 +120,8 @@
                 'Content-Type': 'application/json'
             },
             //make sure to serialize your JSON body
-            body: JSON.stringify({
-            zone:"+506",
-            number: "60032274",
-            password: temp_password,
-            username:"Brazza"
-            }) })
+            body: JSON.stringify({user:temp_encryptedUser})})
+
         let data = await response.json()
         if(response.status==200){
             output.innerHTML+=`my new token is ${data.token}\n`
@@ -109,7 +132,18 @@
     }
 
     function connect(){
-        s2.emit("messenger",{info:token})
+        socket.emit("messenger",{info:token})
+    }
+
+    function sendMessage(){
+        let message = CryptoJS.AES.encrypt("Hola! perro pelon :D",
+                                            generalKey,
+                                            { iv: iv,
+                                              mode: CryptoJS.mode.CBC,
+                                              padding: CryptoJS.pad.Pkcs7})
+
+        temp_message= message.toString()
+        socket.emit("sendMessage",{content:temp_message,from:localUser,numbers:[{zone:"+506",number:"62073447"}]})
     }
 
 </script>

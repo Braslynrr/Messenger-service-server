@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const MESSAGE = "I Will be Encrypted"
+const MESSAGE = "◉"
 
 // TestEncryptAndDecrypy calls EncryptText and DecryptText checking
 func TestEncryptAndDecrypy(t *testing.T) {

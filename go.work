@@ -1,8 +1,6 @@
 go 1.18
 
 use (
-	./Data/Group
-	./Data/User
 	./DataBase/DBService
 	./DataBase/DBUser
 	./Endpoint/MessengerServiceApi
@@ -10,5 +8,7 @@ use (
 	./Endpoint/main
 	./Logic/MessengerManager
 	./Logic/UserManager
+	./Model/Group
+	./Model/User
 	./Utils
 )

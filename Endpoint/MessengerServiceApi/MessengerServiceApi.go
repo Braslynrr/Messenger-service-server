@@ -3,6 +3,8 @@ package messengerserviceapi
 import (
 	"MessengerService/messengermanager"
 	"MessengerService/utils"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,6 +24,7 @@ type Message struct {
 	Info any `json:"info"`
 }
 
+// NewSocketIo creates a new Socketio server instance
 func NewSocketIo() *socketio.Server {
 
 	server := socketio.NewServer(&engineio.Options{
@@ -51,8 +54,9 @@ func NewSocketIo() *socketio.Server {
 		log.Println(s.ID(), "closed due to", reason)
 	})
 
-	server.OnEvent("/", "messenger", ConnectToMessengerService)
+	server.OnEvent("/", "messenger", connectToMessengerService)
 
+	server.OnEvent("/", "sendMessage", HasUserMiddleware(sendMessage))
 	return server
 }
 
@@ -64,21 +68,40 @@ func HandleError(conn socketio.Conn, errortype string, err error) {
 }
 
 // ConnectToMessengerService connects a user to Online channel using a token
-func ConnectToMessengerService(conn socketio.Conn, args Message) {
+func connectToMessengerService(conn socketio.Conn, args Message) {
+	var err error
+	var encryptedUser string
 	MS, err := messengermanager.NewMessengerManager()
 	token := fmt.Sprintf("%v", args.Info)
 	user, err := MS.HasTokenAccess(token)
 	if err == nil {
 		AESkey := fmt.Sprintf("%v", conn.Context())
-		//user.Password, err = utils.EncryptText(AESkey, user.Password)
 		user.SetSocketID(conn.ID())
 		conn.SetContext(gin.H{"key": AESkey, "user": *user})
 		conn.Join("Online")
-		conn.Emit("Log In", user)
+		conn.Emit("WSKey", AESkey)
+		UserInText, err := json.MarshalIndent(user, "", "")
+		encryptedUser, err = utils.EncryptText(string(UserInText), AESkey)
+		if err != nil {
+			HandleError(conn, "", err)
+			return
+		}
+		conn.Emit("Log In", encryptedUser)
 		// return all user information
+
 		return
 	}
 	HandleError(conn, "", err)
+}
+
+// sendMessage send message to group or chat
+func sendMessage(conn socketio.Conn, message map[string]any) (err error) {
+	// MS, err := messengermanager.NewMessengerManager()
+	if err != nil {
+
+	}
+	HandleError(conn, "", err)
+	return
 }
 
 // GetPage Return the Test page
@@ -103,8 +126,20 @@ func GetKey(c *gin.Context) {
 	c.JSON(200, map[string]interface{}{"initialValue": data})
 }
 
-func SocketServer(c *gin.Context) {
+// HasUserMiddleware checks if user is loged in
+func HasUserMiddleware(next func(socketio.Conn, map[string]any) error) func(socketio.Conn, map[string]any) error {
+	return func(conn socketio.Conn, arg map[string]any) error {
 
-	NewSocketIo().ServeHTTP(c.Writer, c.Request)
+		context := conn.Context()
+		contextMap, ok := context.(gin.H)
+		if ok {
 
+			if contextMap["user"] != nil {
+				return next(conn, arg)
+			}
+
+		}
+		HandleError(conn, "", errors.New("connection has done an invalid action due to should log in."))
+		return nil
+	}
 }
