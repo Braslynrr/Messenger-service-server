@@ -62,7 +62,13 @@ func (ms *messengerManager) SaveMessage(user *user.User, to []*user.User, messag
 	ID, err = groupmanager.HasGroup(user, to)
 	if err == nil {
 		message.GroupID = ID
-		numbers, err = groupmanager.SaveMessage(message)
+		err = groupmanager.SaveMessage(message)
+		if err == nil {
+			for _, user := range append(to, user) {
+				numbers = append(numbers, user.Zone+user.Number)
+			}
+		}
+
 	}
 
 	return

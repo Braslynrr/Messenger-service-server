@@ -9,7 +9,7 @@ import (
 )
 
 // SendMessage sends a message to the DB
-func SaveMessage(message *message.Message) (numbers []string, err error) {
+func SaveMessage(message *message.Message) (err error) {
 	dbs, err := dbservice.NewDBService()
 	if err == nil {
 		err = dbs.SaveMessage(message)

@@ -134,6 +134,7 @@ func sendMessage(conn socketio.Conn, message map[string]any) (err error) {
 						numbers, err = MS.SaveMessage(&user, toList, newMessage)
 
 						MS.BroadCastToNumbers(numbers, newMessage)
+
 					}
 				} else {
 					err = errors.New("Message need almost one user data")

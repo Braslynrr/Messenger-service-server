@@ -14,7 +14,7 @@ import (
 func CheckGroup(user *user.User, to []*user.User, client *mongo.Client, ctx context.Context) (id any, err error) {
 	collection := client.Database("Messenger").Collection("Messages")
 	members := append(to, user)
-	filters := bson.M{"Members": members}
+	filters := bson.M{"members": bson.M{"$size": len(members), "$all": members}}
 	result := collection.FindOne(ctx, filters)
 	group := &group.Group{}
 	err = result.Decode(group)
