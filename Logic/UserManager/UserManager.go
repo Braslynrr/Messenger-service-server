@@ -2,11 +2,10 @@ package usermanager
 
 import (
 	"MessengerService/dbservice"
+	"MessengerService/message"
 	"MessengerService/user"
 	"MessengerService/utils"
 	"errors"
-
-	"github.com/gorilla/websocket"
 )
 
 type UserManager struct {
@@ -43,21 +42,13 @@ func (UM *UserManager) Login(user user.User) (ok *user.User, err error) {
 		}
 	}
 	if ok == nil || !user.Credentials(ok) {
-		err = errors.New("The given credentials are incorrect.")
+		err = errors.New("the given credentials are incorrect")
 	}
 
 	return
 }
 
-// Connect  calls login checks login is ok and adds user to userList
-func (UM *UserManager) Connect(token string, conn *websocket.Conn) (ok bool, err error) {
-
-	if UM.tokenList[token] == nil {
-		return false, errors.New("Token doesn't exist.")
-	}
-	return true, nil
-}
-
+// GenerateToken Generates a new token and assing it to a user
 func (UM *UserManager) GenerateToken(user *user.User) (token string, err error) {
 	token, err = utils.GenerateToken()
 	if err == nil {
@@ -66,10 +57,19 @@ func (UM *UserManager) GenerateToken(user *user.User) (token string, err error) 
 	return
 }
 
+// ProcessToken Process a token and put it on current userList
 func (UM *UserManager) ProcessToken(token string) (*user.User, error) {
 	if user := UM.tokenList[token]; user != nil {
 		UM.UserList[user.Zone+user.Number] = user
 		return user, nil
 	}
-	return nil, errors.New("Invalid Token")
+	return nil, errors.New("invalid token")
+}
+
+// SendMessageTo sends a message to a number
+func (UM *UserManager) SendMessageTo(number string, message *message.Message) {
+	user := UM.UserList[number]
+	if user != nil {
+		user.GetSocket().Emit("NewMessage", message)
+	}
 }

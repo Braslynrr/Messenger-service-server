@@ -63,6 +63,10 @@
         
     })
 
+    socket.on("NewMessage",function(message){
+            output.innerHTML+=`New message is ${JSON.stringify(message)}\n`
+    })
+
     async function addUser(){
         let user = JSON.stringify({
             zone:"+506",
@@ -136,14 +140,15 @@
     }
 
     function sendMessage(){
-        let message = CryptoJS.AES.encrypt("Hola! perro pelon :D",
-                                            generalKey,
+        let content =  JSON.stringify({content:"Hola! perro pelon :D",from:localUser,to:[{zone:"+506",number:"62073447"}]})
+        let message = CryptoJS.AES.encrypt(content,
+                                            WSKey,
                                             { iv: iv,
                                               mode: CryptoJS.mode.CBC,
                                               padding: CryptoJS.pad.Pkcs7})
 
         temp_message= message.toString()
-        socket.emit("sendMessage",{content:temp_message,from:localUser,numbers:[{zone:"+506",number:"62073447"}]})
+        socket.emit("sendMessage",{message:temp_message})
     }
 
 </script>

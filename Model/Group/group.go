@@ -6,6 +6,7 @@ import (
 )
 
 type Group struct {
+	ID          any `bson:"_id,omitempty"`
 	Members     []*user.User
 	GroupName   string
 	Description string
@@ -27,9 +28,12 @@ func NewGroup(users ...*user.User) (newGroup *Group, err error) {
 
 	if len(newGroup.Members) < 2 {
 		newGroup = nil
-		err = errors.New("There aren't enough users")
+		err = errors.New("there aren't enough users")
 	} else if len(newGroup.Members) > 3 {
 		newGroup.IsChat = false
+		for _, member := range newGroup.Members {
+			newGroup.GroupName += member.UserName + " "
+		}
 	}
 	return newGroup, err
 }

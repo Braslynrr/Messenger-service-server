@@ -3,15 +3,17 @@ package user
 import (
 	"errors"
 	"regexp"
+
+	socketio "github.com/googollee/go-socket.io"
 )
 
 type User struct {
-	Number   string `bson:"number"`
-	Zone     string `bson:"zone"`
-	State    string `bson:"state"`
-	UserName string `bson:"username"`
-	Password string `bson:"password"`
-	socketID string `bson:"-" json:"-"`
+	Number   string        `bson:"number"`
+	Zone     string        `bson:"zone"`
+	State    string        `bson:"state,omitempty"`
+	UserName string        `bson:"username,omitempty"`
+	Password string        `bson:"password,omitempty"`
+	socket   socketio.Conn `bson:"-" json:"-"`
 }
 
 // NewUser creates a new user, if the parameter is a user which has any golang default property then it will be filled with default values
@@ -21,7 +23,7 @@ func NewUser(user User) (*User, error) {
 
 	if match, err := regexp.MatchString(`\d{8,}`, user.Number); !match {
 		if err == nil {
-			err = errors.New("Number does not match.")
+			err = errors.New("number does not match")
 		}
 		return nil, err
 	} else {
@@ -30,7 +32,7 @@ func NewUser(user User) (*User, error) {
 
 	if match, err := regexp.MatchString(`\+\d{3,}`, user.Zone); !match {
 		if err == nil {
-			err = errors.New("zone does not match.")
+			err = errors.New("zone does not match")
 		}
 		return nil, err
 	} else {
@@ -38,7 +40,7 @@ func NewUser(user User) (*User, error) {
 	}
 
 	if user.Password == "" {
-		err = errors.New("Password cant be empty.")
+		err = errors.New("password cant be empty")
 		return nil, err
 	} else {
 		newUser.Password = user.Password
@@ -65,11 +67,11 @@ func (user *User) Credentials(other *User) bool {
 }
 
 // SetSocketID sets socket ID
-func (user *User) SetSocketID(ID string) {
-	user.socketID = ID
+func (user *User) SetSocketID(conn socketio.Conn) {
+	user.socket = conn
 }
 
 // GetSocket gets socket ID
-func (user *User) GetSocket() string {
-	return user.socketID
+func (user *User) GetSocket() socketio.Conn {
+	return user.socket
 }

@@ -4,8 +4,9 @@ import (
 	messengerserviceapi "MessengerService/messengerserviceApi"
 	"MessengerService/userserviceapi"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
-	ginsession "github.com/go-session/gin-session"
 	cors "github.com/rs/cors/wrapper/gin"
 )
 
@@ -13,7 +14,8 @@ func main() {
 	socketioServer := messengerserviceapi.NewSocketIo()
 	router := gin.Default()
 	router.Use(cors.Default())
-	router.Use(ginsession.New())
+	store := cookie.NewStore([]byte(""))
+	router.Use(sessions.Sessions("key", store))
 
 	router.LoadHTMLFiles("websockets.html")
 	router.GET("/", messengerserviceapi.GetPage)

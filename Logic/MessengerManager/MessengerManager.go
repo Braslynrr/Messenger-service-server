@@ -1,11 +1,13 @@
 package messengermanager
 
 import (
+	"MessengerService/groupmanager"
+	"MessengerService/message"
 	"MessengerService/user"
 	"MessengerService/usermanager"
 	"sync"
 
-	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type messengerManager struct {
@@ -39,6 +41,7 @@ func (ms *messengerManager) InsertUser(user user.User) (ok bool, err error) {
 	return
 }
 
+// Login check user credentials to return a new token
 func (ms *messengerManager) Login(user user.User) (token string, err error) {
 	ok, err := ms.userManager.Login(user)
 	if ok != nil && err == nil {
@@ -47,12 +50,27 @@ func (ms *messengerManager) Login(user user.User) (token string, err error) {
 	return
 }
 
-func (ms *messengerManager) ConnectUser(token string, conn *websocket.Conn) error {
-	_, err := ms.userManager.Connect(token, conn)
-	return err
-}
-
+// HasTokenAccess proccess a token an add user to userlist
 func (ms *messengerManager) HasTokenAccess(token string) (user *user.User, err error) {
 	user, err = ms.userManager.ProcessToken(token)
 	return
+}
+
+// SendMessage initialize the process of sending a message
+func (ms *messengerManager) SaveMessage(user *user.User, to []*user.User, message *message.Message) (numbers []string, err error) {
+	var ID primitive.ObjectID
+	ID, err = groupmanager.HasGroup(user, to)
+	if err == nil {
+		message.GroupID = ID
+		numbers, err = groupmanager.SaveMessage(message)
+	}
+
+	return
+}
+
+// BroadCastToNumbers broadcast a message to a group of numbers
+func (ms *messengerManager) BroadCastToNumbers(numbers []string, message *message.Message) {
+	for _, number := range numbers {
+		ms.userManager.SendMessageTo(number, message)
+	}
 }
