@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 
 	"github.com/zenazn/pkcs7pad"
 )
@@ -86,5 +87,21 @@ func EncryptText(text string, key string) (string, error) {
 	plaintext := []byte(text)
 	encryptedText, err := encrypt_aes_cbc(plaintext, keyInBytes)
 	base64Text := base64.StdEncoding.EncodeToString(encryptedText)
+	return base64Text, err
+}
+
+// EncryptInterface encrypts an interface
+func EncryptInterface(something any, key string) (encrypted string, err error) {
+	var bytes []byte
+	var keyInBytes []byte
+
+	bytes, err = json.MarshalIndent(something, "", "")
+	if err == nil {
+		keyInBytes, err = hex.DecodeString(key)
+		if err == nil {
+			bytes, err = encrypt_aes_cbc(bytes, keyInBytes)
+		}
+	}
+	base64Text := base64.StdEncoding.EncodeToString(bytes)
 	return base64Text, err
 }

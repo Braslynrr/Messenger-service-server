@@ -2,11 +2,13 @@ package usermanager
 
 import (
 	"MessengerService/dbservice"
+	"MessengerService/message"
 	"MessengerService/user"
 	"MessengerService/utils"
 	"errors"
 
-	"github.com/gorilla/websocket"
+	"github.com/gin-gonic/gin"
+	"github.com/zishang520/socket.io/socket"
 )
 
 type UserManager struct {
@@ -43,21 +45,13 @@ func (UM *UserManager) Login(user user.User) (ok *user.User, err error) {
 		}
 	}
 	if ok == nil || !user.Credentials(ok) {
-		err = errors.New("The given credentials are incorrect.")
+		err = errors.New("the given credentials are incorrect")
 	}
 
 	return
 }
 
-// Connect  calls login checks login is ok and adds user to userList
-func (UM *UserManager) Connect(token string, conn *websocket.Conn) (ok bool, err error) {
-
-	if UM.tokenList[token] == nil {
-		return false, errors.New("Token doesn't exist.")
-	}
-	return true, nil
-}
-
+// GenerateToken Generates a new token and assing it to a user
 func (UM *UserManager) GenerateToken(user *user.User) (token string, err error) {
 	token, err = utils.GenerateToken()
 	if err == nil {
@@ -66,10 +60,47 @@ func (UM *UserManager) GenerateToken(user *user.User) (token string, err error) 
 	return
 }
 
+// ProcessToken Process a token and put it on current userList
 func (UM *UserManager) ProcessToken(token string) (*user.User, error) {
 	if user := UM.tokenList[token]; user != nil {
 		UM.UserList[user.Zone+user.Number] = user
 		return user, nil
 	}
-	return nil, errors.New("Invalid Token")
+	return nil, errors.New("invalid token")
+}
+
+// MapNumbersToSocketID Map number to socketsID
+func (UM *UserManager) MapNumbersToSocketID(numbers []string) (numberMap map[socket.SocketId]bool) {
+	numberMap = make(map[socket.SocketId]bool, 0)
+	for _, number := range numbers {
+		if UM.UserList[number] != nil {
+			numberMap[UM.UserList[number].GetSocket()] = true
+		}
+	}
+	return numberMap
+}
+
+// send new message to a group of numbers online
+func (UM *UserManager) SendToNumber(conn *socket.Socket, sockets map[socket.SocketId]bool, message *message.Message) {
+
+	onlineSockets := conn.To("Online").FetchSockets()
+	context := conn.Data().(gin.H)
+
+	for _, socket := range onlineSockets {
+
+		if sockets[socket.Id()] {
+			usercontext := socket.Data().(gin.H)
+			encyptedMessage, err := utils.EncryptInterface(message, usercontext["key"].(string))
+			if err == nil {
+				socket.Emit("NewMessage", encyptedMessage)
+			}
+		}
+	}
+	encyptedMessage, err := utils.EncryptInterface(map[string]any{"ok": true, "message": message}, context["key"].(string))
+	if err == nil {
+		conn.Emit("SendedMessage", encyptedMessage)
+	} else {
+		conn.Emit("error", gin.H{"error": err.Error()})
+	}
+
 }

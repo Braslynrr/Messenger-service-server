@@ -1,16 +1,20 @@
 package dbservice
 
 import (
+	"MessengerService/dbgroup"
 	"MessengerService/dbuser"
+	"MessengerService/group"
+	"MessengerService/message"
 	"MessengerService/user"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -39,7 +43,7 @@ func NewDBService() (*dbService, error) {
 
 	if instance == nil {
 
-		content, err := ioutil.ReadFile(passwordFile)
+		content, err := os.ReadFile(passwordFile)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +91,7 @@ func (dbs dbService) InsertUser(user user.User) (ok bool, err error) {
 	user2, err2 := dbuser.GetUser(user, dbs.dbclient, dbs.dbcontext)
 
 	if err2 == nil && user.IsEqual(user2) {
-		ok, err = false, errors.New("The User is already registered.")
+		ok, err = false, errors.New("the user is already registered")
 	} else if err == nil {
 		ok, err = dbuser.InsertUser(user, dbs.dbclient, dbs.dbcontext)
 		dbs.close()
@@ -114,5 +118,82 @@ func (dbs dbService) Login(localUser user.User) (user *user.User, err error) {
 		user, err = dbuser.Login(localUser, dbs.dbclient, dbs.dbcontext)
 		dbs.close()
 	}
+	return
+}
+
+// CheckGroup checks if chat or group exists
+func (dbs dbService) CheckGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
+	var groupID any
+	var ok bool
+	user.UserName = ""
+	user.Password = ""
+	user.State = ""
+	err = dbs.connect()
+	if err == nil {
+		groupID, err = dbgroup.CheckGroup(user, to, dbs.dbclient, dbs.dbcontext)
+		if err == nil {
+			ID, ok = groupID.(primitive.ObjectID)
+			if !ok {
+				err = errors.New("it has occured a problem parsing group ID")
+			}
+		}
+	}
+	dbs.close()
+	return
+}
+
+// CheckGroup creates a new one
+func (dbs dbService) CreateGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
+	var groupID any
+	var ok bool
+	user.UserName = ""
+	user.Password = ""
+	user.State = ""
+	err = dbs.connect()
+	if err == nil {
+		groupID, err = dbgroup.CreateGroup(user, to, dbs.dbclient, dbs.dbcontext)
+		if err == nil {
+			ID, ok = groupID.(primitive.ObjectID)
+			if !ok {
+				err = errors.New("it has occured a problem parsing group ID")
+			}
+		}
+	}
+	dbs.close()
+	return
+}
+
+// SaveMessage Saves message in the DB
+func (dbs dbService) SaveMessage(message *message.Message) (err error) {
+	err = dbs.connect()
+	if err == nil {
+		err = dbgroup.SaveMessage(message, dbs.dbclient, dbs.dbcontext)
+		if err == nil {
+			err = dbs.close()
+		}
+	}
+	return
+}
+
+// GetGroup gets a existing group from db
+func (dbs dbService) GetGroup(ID primitive.ObjectID) (group *group.Group, err error) {
+	err = dbs.connect()
+	if err == nil {
+		group, err = dbgroup.GetGroup(ID, dbs.dbclient, dbs.dbcontext)
+	}
+	dbs.close()
+	return
+}
+
+// GetAllGroups return all groups of an user
+func (dbs dbService) GetAllGroups(user *user.User) (groups []group.Group, err error) {
+	err = dbs.connect()
+	if err == nil {
+		user.State = ""
+		user.Password = ""
+		user.UserName = ""
+		groups, err = dbgroup.GetAllGroups(user, dbs.dbclient, dbs.dbcontext)
+	}
+	dbs.close()
 	return
 }

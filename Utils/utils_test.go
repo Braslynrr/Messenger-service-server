@@ -2,14 +2,15 @@ package utils_test
 
 import (
 	"MessengerService/utils"
+	"encoding/json"
 
 	"testing"
 )
 
-const MESSAGE = "I Will be Encrypted"
+const MESSAGE = "◉"
 
 // TestEncryptAndDecrypy calls EncryptText and DecryptText checking
-func TestEncryptAndDecrypy(t *testing.T) {
+func TestEncryptAndDecryt(t *testing.T) {
 	key, err := utils.GenerateRandomAESKey(16)
 
 	if err != nil {
@@ -48,4 +49,30 @@ func TestGenerateDifferentKeys(t *testing.T) {
 		}
 	}
 
+}
+
+// TestEncryptAndDecrytInterface calls EncryptInterface to encrypt and interface
+func TestEncryptAndDecrytInterface(t *testing.T) {
+	type example struct {
+		Example   string
+		Something int
+	}
+	key, _ := utils.GenerateRandomAESKey(16)
+	exampleVariable := example{Example: "example", Something: 1}
+
+	encryptedText, err := utils.EncryptInterface(exampleVariable, key)
+
+	if err != nil {
+		t.Fatalf("EncryptInterface should not return an error: %v", err.Error())
+	}
+
+	plain, err := utils.DecryptText(encryptedText, key)
+	if err != nil {
+		t.Fatalf("DecryptInterface should not return an error: %v", err.Error())
+	}
+
+	err = json.Unmarshal([]byte(plain), &exampleVariable)
+	if err != nil {
+		t.Fatalf("Unmarshal should be ok. erro: %v", err)
+	}
 }

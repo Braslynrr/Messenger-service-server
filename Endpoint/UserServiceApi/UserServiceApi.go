@@ -1,89 +1,103 @@
 package userserviceapi
 
 import (
-	"MessengerService/messengermanager"
+	messengermanager "MessengerService/mesermanager"
 	"MessengerService/user"
 	"MessengerService/utils"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	ginsession "github.com/go-session/gin-session"
-	"github.com/gorilla/websocket"
 )
 
 // NewUser recieves post request to regsister a new user
 func NewUser(c *gin.Context) {
-	var tempUser *user.User
+	tempUser := &user.User{}
+	var encryptedUser string
+	var bytes []byte
+	var err error
 
-	if err := c.BindJSON(&tempUser); err != nil {
+	if bytes, err = c.GetRawData(); err != nil {
 		c.IndentedJSON(http.StatusNotAcceptable, err)
+		return
 	}
 
-	tempUser, err := user.NewUser(*tempUser)
+	session := sessions.Default(c)
+	key := session.Get("key")
 
+	encryptedUser, err = utils.DecryptText(string(bytes), fmt.Sprint(key))
 	if err == nil {
 
-		messman, err := messengermanager.NewMessengerManager()
+		err = json.Unmarshal([]byte(encryptedUser), tempUser)
 
 		if err == nil {
 
-			ok, err := messman.InsertUser(*tempUser)
+			messman, err2 := messengermanager.NewMessengerManager()
+			err = err2
+			if err2 == nil {
+				var ok bool
+				ok, err = messman.InsertUser(*tempUser)
 
-			if ok && err == nil {
+				if ok && err == nil {
 
-				c.Done()
-				return
+					c.Done()
+					return
+				}
 			}
 		}
 	}
 	c.IndentedJSON(http.StatusNotAcceptable, err)
 }
 
+// Login checks if user exists to returns a new token to connect
 func Login(c *gin.Context) {
-	var tempUser *user.User
+	tempUser := &user.User{}
+	var bytes []byte
+	var encryptedUser string
 	var err error
 	var token string
 
-	if err = c.BindJSON(&tempUser); err != nil {
+	if bytes, err = c.GetRawData(); err != nil {
 		c.IndentedJSON(http.StatusNotAcceptable, err)
 		return
 	}
+	session := sessions.Default(c)
+	key := session.Get("key")
 
-	tempUser, err = user.NewUser(*tempUser)
+	encryptedUser, err = utils.DecryptText(string(bytes), fmt.Sprint(key))
 
 	if err == nil {
 
-		messman, mmerr := messengermanager.NewMessengerManager()
+		err = json.Unmarshal([]byte(encryptedUser), tempUser)
 
-		if mmerr == nil {
+		if err == nil {
 
-			store := ginsession.FromContext(c)
-			key, _ := store.Get("key")
-			tempUser.Password, err = utils.DecryptText(tempUser.Password, fmt.Sprint(key))
+			tempUser, err = user.NewUser(*tempUser)
 
 			if err == nil {
 
-				token, err = messman.Login(*tempUser)
+				messman, mmerr := messengermanager.NewMessengerManager()
 
-				if err == nil {
+				if mmerr == nil {
 
-					c.IndentedJSON(http.StatusOK, gin.H{"token": token})
-					return
+					if err == nil {
+
+						token, err = messman.Login(*tempUser)
+
+						if err == nil {
+
+							c.IndentedJSON(http.StatusOK, gin.H{"token": token})
+							return
+						}
+					}
+
+				} else {
+					err = mmerr
 				}
 			}
-
-		} else {
-			err = mmerr
 		}
 	}
 	c.IndentedJSON(http.StatusNotAcceptable, gin.H{"error": err.Error()})
-}
-
-func ConnectUser(token string, conn *websocket.Conn, encryptKey string) error {
-	MM, err := messengermanager.NewMessengerManager()
-	if err == nil {
-		err = MM.ConnectUser(token, conn)
-	}
-	return err
 }
