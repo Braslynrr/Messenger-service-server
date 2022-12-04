@@ -16,10 +16,10 @@ import (
 func NewUser(c *gin.Context) {
 	tempUser := &user.User{}
 	var encryptedUser string
-	var mapUser map[string]string
+	var bytes []byte
 	var err error
 
-	if err = c.BindJSON(&mapUser); err != nil {
+	if bytes, err = c.GetRawData(); err != nil {
 		c.IndentedJSON(http.StatusNotAcceptable, err)
 		return
 	}
@@ -27,22 +27,24 @@ func NewUser(c *gin.Context) {
 	session := sessions.Default(c)
 	key := session.Get("key")
 
-	encryptedUser, err = utils.DecryptText(mapUser["user"], fmt.Sprint(key))
-
-	err = json.Unmarshal([]byte(encryptedUser), tempUser)
-
+	encryptedUser, err = utils.DecryptText(string(bytes), fmt.Sprint(key))
 	if err == nil {
 
-		messman, err2 := messengermanager.NewMessengerManager()
-		err = err2
-		if err2 == nil {
-			var ok bool
-			ok, err = messman.InsertUser(*tempUser)
+		err = json.Unmarshal([]byte(encryptedUser), tempUser)
 
-			if ok && err == nil {
+		if err == nil {
 
-				c.Done()
-				return
+			messman, err2 := messengermanager.NewMessengerManager()
+			err = err2
+			if err2 == nil {
+				var ok bool
+				ok, err = messman.InsertUser(*tempUser)
+
+				if ok && err == nil {
+
+					c.Done()
+					return
+				}
 			}
 		}
 	}
@@ -52,19 +54,19 @@ func NewUser(c *gin.Context) {
 // Login checks if user exists to returns a new token to connect
 func Login(c *gin.Context) {
 	tempUser := &user.User{}
+	var bytes []byte
 	var encryptedUser string
-	var mapUser map[string]string
 	var err error
 	var token string
 
-	if err = c.BindJSON(&mapUser); err != nil {
+	if bytes, err = c.GetRawData(); err != nil {
 		c.IndentedJSON(http.StatusNotAcceptable, err)
 		return
 	}
 	session := sessions.Default(c)
 	key := session.Get("key")
 
-	encryptedUser, err = utils.DecryptText(mapUser["user"], fmt.Sprint(key))
+	encryptedUser, err = utils.DecryptText(string(bytes), fmt.Sprint(key))
 
 	if err == nil {
 

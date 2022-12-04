@@ -1,12 +1,14 @@
 package messengermanager
 
 import (
+	"MessengerService/group"
 	"MessengerService/groupmanager"
 	"MessengerService/message"
 	"MessengerService/user"
 	"MessengerService/usermanager"
 	"sync"
 
+	"github.com/zishang520/socket.io/socket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -56,27 +58,41 @@ func (ms *messengerManager) HasTokenAccess(token string) (user *user.User, err e
 	return
 }
 
-// SendMessage initialize the process of sending a message
-func (ms *messengerManager) SaveMessage(user *user.User, to []*user.User, message *message.Message) (numbers []string, err error) {
-	var ID primitive.ObjectID
-	ID, err = groupmanager.HasGroup(user, to)
-	if err == nil {
-		message.GroupID = ID
-		err = groupmanager.SaveMessage(message)
-		if err == nil {
-			for _, user := range append(to, user) {
-				numbers = append(numbers, user.Zone+user.Number)
-			}
-		}
+func (ms *messengerManager) CheckGroup(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
+	groupID, err = groupmanager.CheckGroup(user, to)
+	return
+}
 
+func (ms *messengerManager) CreateGroup(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
+	groupID, err = groupmanager.CreateGroup(user, to)
+	return
+}
+
+func (ms *messengerManager) GetGroup(groupID primitive.ObjectID) (group *group.Group, err error) {
+	group, err = groupmanager.GetGroup(groupID)
+	return
+}
+
+// SendMessage initialize the process of sending a message
+func (ms *messengerManager) SaveMessage(user *user.User, to []*user.User, message *message.Message) (numbers map[socket.SocketId]bool, err error) {
+	err = groupmanager.SaveMessage(message)
+	if err == nil {
+		var tempNumbers []string
+		for _, user := range append(to, user) {
+			tempNumbers = append(tempNumbers, user.Zone+user.Number)
+		}
+		numbers = ms.userManager.MapNumbersToSocketID(tempNumbers)
 	}
 
 	return
 }
 
-// BroadCastToNumbers broadcast a message to a group of numbers
-func (ms *messengerManager) BroadCastToNumbers(numbers []string, message *message.Message) {
-	for _, number := range numbers {
-		ms.userManager.SendMessageTo(number, message)
-	}
+// SendToNumber send a message to a group of numbers
+func (ms *messengerManager) SendToNumber(conn *socket.Socket, numbers map[socket.SocketId]bool, message *message.Message) {
+	ms.userManager.SendToNumber(conn, numbers, message)
+}
+
+func (ms *messengerManager) GetAllGroups(user user.User) (groups []group.Group, err error) {
+	groups, err = groupmanager.GetAllGroups(&user)
+	return
 }

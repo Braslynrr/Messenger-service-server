@@ -4,16 +4,16 @@ import (
 	"errors"
 	"regexp"
 
-	socketio "github.com/googollee/go-socket.io"
+	"github.com/zishang520/socket.io/socket"
 )
 
 type User struct {
-	Number   string        `bson:"number"`
-	Zone     string        `bson:"zone"`
-	State    string        `bson:"state,omitempty"`
-	UserName string        `bson:"username,omitempty"`
-	Password string        `bson:"password,omitempty"`
-	socket   socketio.Conn `bson:"-" json:"-"`
+	Number   string          `bson:"number"`
+	Zone     string          `bson:"zone"`
+	State    string          `bson:"state,omitempty" json:"state,omitempty"`
+	UserName string          `bson:"username,omitempty" json:"username,omitempty"`
+	Password string          `bson:"password,omitempty" json:"password,omitempty"`
+	socket   socket.SocketId `bson:"-" json:"-"`
 }
 
 // NewUser creates a new user, if the parameter is a user which has any golang default property then it will be filled with default values
@@ -67,11 +67,11 @@ func (user *User) Credentials(other *User) bool {
 }
 
 // SetSocketID sets socket ID
-func (user *User) SetSocketID(conn socketio.Conn) {
-	user.socket = conn
+func (user *User) SetSocketID(id socket.SocketId) {
+	user.socket = id
 }
 
 // GetSocket gets socket ID
-func (user *User) GetSocket() socketio.Conn {
+func (user *User) GetSocket() socket.SocketId {
 	return user.socket
 }

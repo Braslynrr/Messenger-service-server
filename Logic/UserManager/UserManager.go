@@ -6,6 +6,9 @@ import (
 	"MessengerService/user"
 	"MessengerService/utils"
 	"errors"
+
+	"github.com/gin-gonic/gin"
+	"github.com/zishang520/socket.io/socket"
 )
 
 type UserManager struct {
@@ -66,10 +69,38 @@ func (UM *UserManager) ProcessToken(token string) (*user.User, error) {
 	return nil, errors.New("invalid token")
 }
 
-// SendMessageTo sends a message to a number
-func (UM *UserManager) SendMessageTo(number string, message *message.Message) {
-	user := UM.UserList[number]
-	if user != nil {
-		user.GetSocket().Emit("NewMessage", message)
+// MapNumbersToSocketID Map number to socketsID
+func (UM *UserManager) MapNumbersToSocketID(numbers []string) (numberMap map[socket.SocketId]bool) {
+	numberMap = make(map[socket.SocketId]bool, 0)
+	for _, number := range numbers {
+		if UM.UserList[number] != nil {
+			numberMap[UM.UserList[number].GetSocket()] = true
+		}
 	}
+	return numberMap
+}
+
+// send new message to a group of numbers online
+func (UM *UserManager) SendToNumber(conn *socket.Socket, sockets map[socket.SocketId]bool, message *message.Message) {
+
+	onlineSockets := conn.To("Online").FetchSockets()
+	context := conn.Data().(gin.H)
+
+	for _, socket := range onlineSockets {
+
+		if sockets[socket.Id()] {
+			usercontext := socket.Data().(gin.H)
+			encyptedMessage, err := utils.EncryptInterface(message, usercontext["key"].(string))
+			if err == nil {
+				socket.Emit("NewMessage", encyptedMessage)
+			}
+		}
+	}
+	encyptedMessage, err := utils.EncryptInterface(map[string]any{"ok": true, "message": message}, context["key"].(string))
+	if err == nil {
+		conn.Emit("SendedMessage", encyptedMessage)
+	} else {
+		conn.Emit("error", gin.H{"error": err.Error()})
+	}
+
 }
