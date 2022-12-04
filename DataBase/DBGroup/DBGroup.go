@@ -60,6 +60,7 @@ func GetGroup(ID primitive.ObjectID, client *mongo.Client, ctx context.Context) 
 	return
 }
 
+// GetUsersFromGroup gets all user from an group
 func GetUsersFromGroup(members []*user.User, client *mongo.Client, ctx context.Context) (users []*user.User, err error) {
 	collection := client.Database("Messenger").Collection("Messenger")
 	for _, member := range members {
@@ -72,6 +73,7 @@ func GetUsersFromGroup(members []*user.User, client *mongo.Client, ctx context.C
 	return
 }
 
+// GetAllGroups gets all groups and its members
 func GetAllGroups(localuser *user.User, client *mongo.Client, ctx context.Context) (groups []group.Group, err error) {
 	collection := client.Database("Messenger").Collection("Messages")
 	cursor, err := collection.Find(ctx, bson.M{"members": bson.M{"$all": bson.A{localuser}}})

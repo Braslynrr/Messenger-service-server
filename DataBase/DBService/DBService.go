@@ -185,6 +185,7 @@ func (dbs dbService) GetGroup(ID primitive.ObjectID) (group *group.Group, err er
 	return
 }
 
+// GetAllGroups return all groups of an user
 func (dbs dbService) GetAllGroups(user *user.User) (groups []group.Group, err error) {
 	err = dbs.connect()
 	if err == nil {

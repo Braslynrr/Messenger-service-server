@@ -58,16 +58,19 @@ func (ms *messengerManager) HasTokenAccess(token string) (user *user.User, err e
 	return
 }
 
+// CheckGroupc checks if a group already exist
 func (ms *messengerManager) CheckGroup(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
 	groupID, err = groupmanager.CheckGroup(user, to)
 	return
 }
 
+// CreateGroup create a new group in the DB
 func (ms *messengerManager) CreateGroup(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
 	groupID, err = groupmanager.CreateGroup(user, to)
 	return
 }
 
+// GetGroup gets a group by its identificator
 func (ms *messengerManager) GetGroup(groupID primitive.ObjectID) (group *group.Group, err error) {
 	group, err = groupmanager.GetGroup(groupID)
 	return
@@ -92,6 +95,7 @@ func (ms *messengerManager) SendToNumber(conn *socket.Socket, numbers map[socket
 	ms.userManager.SendToNumber(conn, numbers, message)
 }
 
+// GetAllGroups gets all groups and its member using an user
 func (ms *messengerManager) GetAllGroups(user user.User) (groups []group.Group, err error) {
 	groups, err = groupmanager.GetAllGroups(&user)
 	return

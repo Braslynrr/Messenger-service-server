@@ -94,6 +94,7 @@ func EncryptText(text string, key string) (string, error) {
 func EncryptInterface(something any, key string) (encrypted string, err error) {
 	var bytes []byte
 	var keyInBytes []byte
+
 	bytes, err = json.MarshalIndent(something, "", "")
 	if err == nil {
 		keyInBytes, err = hex.DecodeString(key)
@@ -103,21 +104,4 @@ func EncryptInterface(something any, key string) (encrypted string, err error) {
 	}
 	base64Text := base64.StdEncoding.EncodeToString(bytes)
 	return base64Text, err
-}
-
-// DecryptInterface decrypts an interface
-func DecryptInterface(encodedtext string, key string) (finalObject any, err error) {
-	keyInBytes, err := hex.DecodeString(key)
-	if err != nil {
-		return "", err
-	}
-	text, err := base64.StdEncoding.DecodeString(encodedtext)
-	if err != nil {
-		return "", err
-	}
-	plain, err := decrypt_aes_cbc(text, keyInBytes)
-	if err == nil {
-		err = json.Unmarshal(plain, &finalObject)
-	}
-	return finalObject, err
 }
