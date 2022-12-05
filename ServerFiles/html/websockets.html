@@ -70,11 +70,19 @@
         
     })
     socket.on("AllCurrentGroups",function(encryptedchats){
-        let chats = decryptText(encryptedchats,WSKey)
+        let chats = decryptText(encryptedchats,WSKey) 
         output.innerHTML+=`My chats are\n${JSON.stringify(chats,null, 2)}\n`
+        for(let group of chats){
+            let groupHistory =  encryptObject({ID:group.ID,time:new Date()},WSKey)
+            socket.emit("GroupHistory",groupHistory)
+        }
+    })
+
+    socket.on("History",function(encryptedHistory){
+        let history = decryptText(encryptedHistory,WSKey)
+        output.innerHTML+=`Messages History:\n ${JSON.stringify(history,null, 2)}\n`
     })
     socket.on("NewMessage",function(encryptedmessage){
-        alert(encryptedmessage)
         let message = decryptText(encryptedmessage,WSKey)
         alert(JSON.stringify(message,null, 2))
         output.innerHTML+=`New message is ${JSON.stringify(message,null, 2)}\n`

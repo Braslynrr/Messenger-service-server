@@ -197,3 +197,13 @@ func (dbs dbService) GetAllGroups(user *user.User) (groups []group.Group, err er
 	dbs.close()
 	return
 }
+
+// GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference from DB
+func (dbs dbService) GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
+	err = dbs.connect()
+	if err == nil {
+		history, err = dbgroup.GetGroupHistory(groupID, time, dbs.dbclient, dbs.dbcontext)
+	}
+	dbs.close()
+	return
+}

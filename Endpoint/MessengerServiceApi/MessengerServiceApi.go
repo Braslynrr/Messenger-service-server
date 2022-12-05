@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -48,6 +49,10 @@ func NewSocketIo() http.Handler {
 		client.On("sendMessage", func(message ...any) {
 
 			HandleError(client, "", HasUserMiddleware(client, sendMessage, message...))
+		})
+
+		client.On("GroupHistory", func(history ...any) {
+			HandleError(client, "", HasUserMiddleware(client, GetGroupHistory, history...))
 		})
 
 		client.On("disconnect", func(reason ...any) {
@@ -161,6 +166,46 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 		}
 	}
 	HandleError(conn, "", err)
+	return
+}
+
+// GetGroupHistory returns a list of 10 last messages using a date
+func GetGroupHistory(conn *socket.Socket, decryptedmessage string) (err error) {
+	context := conn.Data().(gin.H)
+	var ID primitive.ObjectID
+	var history []*msmessage.Message
+	var mTime time.Time
+	var info map[string]any
+
+	decryptedmessage, err = utils.DecryptText(decryptedmessage, context["key"].(string))
+	if err == nil {
+		err = json.Unmarshal([]byte(decryptedmessage), &info)
+		if err == nil {
+			MS, err1 := messengermanager.NewMessengerManager()
+			err = err1
+			if err == nil {
+				ID, err = primitive.ObjectIDFromHex(info["ID"].(string))
+				if err == nil {
+					mTime, err = time.Parse(time.RFC3339, info["time"].(string))
+					if err == nil {
+						history, err = MS.GetGroupHistory(ID, mTime)
+						if err == nil {
+							for _, msg := range history {
+								user := context["user"].(user.User)
+								msg.WillSendtoUser(&user)
+							}
+							// re-using variable to encrypt
+							decryptedmessage, err = utils.EncryptInterface(history, context["key"].(string))
+							if err == nil {
+								conn.Emit("History", decryptedmessage)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return
 }
 

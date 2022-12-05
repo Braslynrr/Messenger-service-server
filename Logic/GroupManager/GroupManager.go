@@ -5,6 +5,7 @@ import (
 	"MessengerService/group"
 	"MessengerService/message"
 	"MessengerService/user"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -45,10 +46,20 @@ func GetGroup(ID primitive.ObjectID) (group *group.Group, err error) {
 	return
 }
 
+// GetAllGroups returns all groups of an user
 func GetAllGroups(user *user.User) (groups []group.Group, err error) {
 	dbs, err := dbservice.NewDBService()
 	if err == nil {
 		groups, err = dbs.GetAllGroups(user)
+	}
+	return
+}
+
+// GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
+func GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
+	dbs, err := dbservice.NewDBService()
+	if err == nil {
+		history, err = dbs.GetGroupHistory(groupID, time)
 	}
 	return
 }

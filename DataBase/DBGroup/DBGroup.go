@@ -5,10 +5,12 @@ import (
 	"MessengerService/message"
 	"MessengerService/user"
 	"context"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // CheckGroup checks if a group/chat exists
@@ -86,4 +88,20 @@ func GetAllGroups(localuser *user.User, client *mongo.Client, ctx context.Contex
 
 	return
 
+}
+
+// GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
+func GetGroupHistory(groupID primitive.ObjectID, time time.Time, client *mongo.Client, ctx context.Context) (history []*message.Message, err error) {
+	collection := client.Database("Messenger").Collection("Messages")
+	cursor, err := collection.Find(ctx, bson.M{"groupid": groupID, "sendeddate": bson.M{"$lte": time}}, &options.FindOptions{Sort: bson.M{"sendeddate": -1}})
+	if err == nil {
+		for cursor.Next(ctx) && len(history) < 20 {
+			message := &message.Message{}
+			err = cursor.Decode(&message)
+			if err == nil {
+				history = append(history, message)
+			}
+		}
+	}
+	return
 }
