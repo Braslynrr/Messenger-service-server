@@ -7,6 +7,7 @@ import (
 	"MessengerService/user"
 	"MessengerService/usermanager"
 	"sync"
+	"time"
 
 	"github.com/zishang520/socket.io/socket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -98,5 +99,11 @@ func (ms *messengerManager) SendToNumber(conn *socket.Socket, numbers map[socket
 // GetAllGroups gets all groups and its member using an user
 func (ms *messengerManager) GetAllGroups(user user.User) (groups []group.Group, err error) {
 	groups, err = groupmanager.GetAllGroups(&user)
+	return
+}
+
+// GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
+func (ms *messengerManager) GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
+	history, err = groupmanager.GetGroupHistory(groupID, time)
 	return
 }
