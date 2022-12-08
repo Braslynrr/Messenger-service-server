@@ -81,10 +81,9 @@ func (UM *UserManager) MapNumbersToSocketID(numbers []string) (numberMap map[soc
 }
 
 // send new message to a group of numbers online
-func (UM *UserManager) SendToNumber(conn *socket.Socket, sockets map[socket.SocketId]bool, message *message.Message) {
+func (UM *UserManager) SendToNumber(conn *socket.Socket, Channel string, sockets map[socket.SocketId]bool, message *message.Message) {
 
 	onlineSockets := conn.To("Online").FetchSockets()
-	context := conn.Data().(gin.H)
 
 	for _, socket := range onlineSockets {
 
@@ -92,15 +91,9 @@ func (UM *UserManager) SendToNumber(conn *socket.Socket, sockets map[socket.Sock
 			usercontext := socket.Data().(gin.H)
 			encyptedMessage, err := utils.EncryptInterface(message, usercontext["key"].(string))
 			if err == nil {
-				socket.Emit("NewMessage", encyptedMessage)
+				socket.Emit(Channel, encyptedMessage)
 			}
 		}
-	}
-	encyptedMessage, err := utils.EncryptInterface(map[string]any{"ok": true, "message": message}, context["key"].(string))
-	if err == nil {
-		conn.Emit("SendedMessage", encyptedMessage)
-	} else {
-		conn.Emit("error", gin.H{"error": err.Error()})
 	}
 
 }

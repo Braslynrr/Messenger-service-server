@@ -63,3 +63,12 @@ func GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*mes
 	}
 	return
 }
+
+// UpdateMessageReadBy updates ReadBy field with number and server time
+func UpdateMessageReadBy(messageID primitive.ObjectID, user user.User) (message message.Message, err error) {
+	dbs, err := dbservice.NewDBService()
+	if err == nil {
+		message, err = dbs.UpdateMessageReadBy(messageID, user)
+	}
+	return
+}

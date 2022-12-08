@@ -12,7 +12,7 @@ type Message struct {
 	GroupID    primitive.ObjectID `json:"groupID,omitempty"`
 	From       *user.User
 	Content    string
-	ReadBy     map[string]*time.Time `json:",omitempty" bson:",omitempty"`
+	ReadBy     map[string]*time.Time `json:",omitempty"`
 	IsRead     bool                  `bson:"-"`
 	SendedDate time.Time
 }

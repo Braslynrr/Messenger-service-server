@@ -92,8 +92,8 @@ func (ms *messengerManager) SaveMessage(user *user.User, to []*user.User, messag
 }
 
 // SendToNumber send a message to a group of numbers
-func (ms *messengerManager) SendToNumber(conn *socket.Socket, numbers map[socket.SocketId]bool, message *message.Message) {
-	ms.userManager.SendToNumber(conn, numbers, message)
+func (ms *messengerManager) SendToNumber(conn *socket.Socket, channel string, numbers map[socket.SocketId]bool, message *message.Message) {
+	ms.userManager.SendToNumber(conn, channel, numbers, message)
 }
 
 // GetAllGroups gets all groups and its member using an user
@@ -105,5 +105,17 @@ func (ms *messengerManager) GetAllGroups(user user.User) (groups []group.Group, 
 // GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
 func (ms *messengerManager) GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
 	history, err = groupmanager.GetGroupHistory(groupID, time)
+	return
+}
+
+// MessageWasSeenBy sets a message as senn by user
+func (ms *messengerManager) MessageWasSeenBy(messageID primitive.ObjectID, user user.User) (message message.Message, err error) {
+	message, err = groupmanager.UpdateMessageReadBy(messageID, user)
+	return
+}
+
+// MapNumberToSocketID Map a User to SocketID if it's online
+func (ms *messengerManager) MapNumberToSocketID(user *user.User) (numbers map[socket.SocketId]bool) {
+	numbers = ms.userManager.MapNumbersToSocketID([]string{user.Zone + user.Number})
 	return
 }

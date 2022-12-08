@@ -51,8 +51,16 @@ func NewSocketIo() http.Handler {
 			HandleError(client, "", HasUserMiddleware(client, sendMessage, message...))
 		})
 
+		client.On("GetCurrentGroups", func(...any) {
+			HandleError(client, "", HasUserMiddlewareNoParam(client, GetGroups))
+		})
+
 		client.On("GroupHistory", func(history ...any) {
-			HandleError(client, "", HasUserMiddleware(client, GetGroupHistory, history...))
+			HandleError(client, "", HasUserMiddleware(client, getGroupHistory, history...))
+		})
+
+		client.On("SendSeen", func(SeenMesage ...any) {
+			HandleError(client, "", HasUserMiddleware(client, seenMessage, SeenMesage...))
 		})
 
 		client.On("disconnect", func(reason ...any) {
@@ -90,8 +98,6 @@ func connectToMessengerService(conn *socket.Socket, token string) {
 
 			}
 			conn.Emit("Log In", encryptedUser)
-			// return all user information
-			GetGroups(conn)
 
 			return
 		}
@@ -149,7 +155,13 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 						sockets, err = MS.SaveMessage(&user, toList, newMessage)
 
 						if err == nil {
-							MS.SendToNumber(conn, sockets, newMessage)
+							MS.SendToNumber(conn, "NewMessage", sockets, newMessage)
+							encyptedMessage, err := utils.EncryptInterface(map[string]any{"ok": true, "message": newMessage}, context["key"].(string))
+							if err == nil {
+								conn.Emit("SendedMessage", encyptedMessage)
+							} else {
+								conn.Emit("error", gin.H{"error": err.Error()})
+							}
 
 						} else {
 							encryptedInterface, err = utils.EncryptInterface(newMessage, context["key"].(string))
@@ -169,8 +181,8 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 	return
 }
 
-// GetGroupHistory returns a list of 10 last messages using a date
-func GetGroupHistory(conn *socket.Socket, decryptedmessage string) (err error) {
+// getGroupHistory returns a list of 10 last messages using a date
+func getGroupHistory(conn *socket.Socket, decryptedmessage string) (err error) {
 	context := conn.Data().(gin.H)
 	var ID primitive.ObjectID
 	var history []*msmessage.Message
@@ -206,6 +218,36 @@ func GetGroupHistory(conn *socket.Socket, decryptedmessage string) (err error) {
 		}
 	}
 
+	return
+}
+
+// seenMessage mark as Read a message by this connection user
+func seenMessage(conn *socket.Socket, decryptedmessage string) (err error) {
+	context := conn.Data().(gin.H)
+	var ID primitive.ObjectID
+	var message msmessage.Message
+	var localUser user.User = context["user"].(user.User)
+
+	decryptedmessage, err = utils.DecryptText(decryptedmessage, context["key"].(string))
+	if err == nil {
+		MS, err1 := messengermanager.NewMessengerManager()
+		err = err1
+		if err == nil {
+			ID, err = primitive.ObjectIDFromHex(decryptedmessage)
+			if err == nil {
+				message, err = MS.MessageWasSeenBy(ID, localUser)
+				if err == nil {
+					if !message.From.IsEqual(&localUser) {
+						message.WillSendtoUser(message.From)
+						socket := MS.MapNumberToSocketID(message.From)
+						MS.SendToNumber(conn, "ReadedMessage", socket, &message)
+					}
+
+				}
+
+			}
+		}
+	}
 	return
 }
 
@@ -257,17 +299,30 @@ func GetGroups(conn *socket.Socket) (err error) {
 }
 
 // HasUserMiddleware checks if user is loged in
-func HasUserMiddleware(conn *socket.Socket, next func(*socket.Socket, string) error, args ...any) error {
+func HasUserMiddleware(conn *socket.Socket, next func(*socket.Socket, string) error, args ...any) (err error) {
 
 	context := conn.Data()
 	contextMap, ok := context.(gin.H)
 	if ok {
 		arg, ok := args[0].(string)
 		if ok && contextMap["user"] != nil {
-			next(conn, arg)
-			return nil
+
+			return next(conn, arg)
 		}
 
+	}
+
+	return errors.New("connection has done an invalid action due to should log in")
+}
+
+// HasUserMiddleware checks if user is loged in
+func HasUserMiddlewareNoParam(conn *socket.Socket, next func(*socket.Socket) error) (err error) {
+
+	context := conn.Data()
+	contextMap, ok := context.(gin.H)
+	if ok && contextMap["user"] != nil {
+
+		return next(conn)
 	}
 
 	return errors.New("connection has done an invalid action due to should log in")
