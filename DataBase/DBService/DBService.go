@@ -125,9 +125,7 @@ func (dbs dbService) Login(localUser user.User) (user *user.User, err error) {
 func (dbs dbService) CheckGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
 	var groupID any
 	var ok bool
-	user.UserName = ""
-	user.Password = ""
-	user.State = ""
+	user.LeaveMinimalInformation()
 	err = dbs.connect()
 	if err == nil {
 		groupID, err = dbgroup.CheckGroup(user, to, dbs.dbclient, dbs.dbcontext)
@@ -189,9 +187,7 @@ func (dbs dbService) GetGroup(ID primitive.ObjectID) (group *group.Group, err er
 func (dbs dbService) GetAllGroups(user *user.User) (groups []group.Group, err error) {
 	err = dbs.connect()
 	if err == nil {
-		user.State = ""
-		user.Password = ""
-		user.UserName = ""
+		user.LeaveMinimalInformation()
 		groups, err = dbgroup.GetAllGroups(user, dbs.dbclient, dbs.dbcontext)
 	}
 	dbs.close()
@@ -203,6 +199,26 @@ func (dbs dbService) GetGroupHistory(groupID primitive.ObjectID, time time.Time)
 	err = dbs.connect()
 	if err == nil {
 		history, err = dbgroup.GetGroupHistory(groupID, time, dbs.dbclient, dbs.dbcontext)
+	}
+	dbs.close()
+	return
+}
+
+// UpdateMessageReadBy calls dbgroup.UpdateMessageReadBy to set user as a reader of message
+func (dbs dbService) UpdateMessageReadBy(messageID primitive.ObjectID, localUser user.User) (message message.Message, err error) {
+	err = dbs.connect()
+	if err == nil {
+		message, err = dbgroup.GetMessage(messageID, dbs.dbclient, dbs.dbcontext)
+		if err == nil {
+			if !localUser.IsEqual(message.From) {
+				err = dbgroup.UpdateMessageReadBy(messageID, localUser, dbs.dbclient, dbs.dbcontext)
+				if err == nil {
+					message, err = dbgroup.GetMessage(messageID, dbs.dbclient, dbs.dbcontext)
+				}
+			} else {
+				err = errors.New("user cant see its own message")
+			}
+		}
 	}
 	dbs.close()
 	return

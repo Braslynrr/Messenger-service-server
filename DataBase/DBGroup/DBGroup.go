@@ -70,6 +70,7 @@ func GetUsersFromGroup(members []*user.User, client *mongo.Client, ctx context.C
 		result := collection.FindOne(ctx, filters)
 		err = result.Decode(member)
 		member.Password = ""
+		member.State = ""
 		users = append(users, member)
 	}
 	return
@@ -103,5 +104,21 @@ func GetGroupHistory(groupID primitive.ObjectID, time time.Time, client *mongo.C
 			}
 		}
 	}
+	return
+}
+
+// GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
+func UpdateMessageReadBy(messageID primitive.ObjectID, user user.User, client *mongo.Client, ctx context.Context) (err error) {
+	user.LeaveMinimalInformation()
+	collection := client.Database("Messenger").Collection("Messages")
+	_, err = collection.UpdateByID(ctx, messageID, bson.M{"$set": bson.M{"readby": bson.M{user.Zone + user.Number: time.Now()}}})
+	return
+}
+
+// GetMessage gets a message from DB using an ID
+func GetMessage(messageID primitive.ObjectID, client *mongo.Client, ctx context.Context) (message message.Message, err error) {
+	collection := client.Database("Messenger").Collection("Messages")
+	result := collection.FindOne(ctx, bson.M{"_id": messageID})
+	err = result.Decode(&message)
 	return
 }

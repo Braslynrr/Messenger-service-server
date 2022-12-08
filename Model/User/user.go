@@ -75,3 +75,10 @@ func (user *User) SetSocketID(id socket.SocketId) {
 func (user *User) GetSocket() socket.SocketId {
 	return user.socket
 }
+
+// LeaveMinimalInformation set a user with minimal information to add in DB
+func (user *User) LeaveMinimalInformation() {
+	user.Password = ""
+	user.State = ""
+	user.UserName = ""
+}

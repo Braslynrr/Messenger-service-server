@@ -15,6 +15,7 @@
         <button onclick="login()">Login</button>
         <button onclick="connect()">Connect</button>
         <button onclick="sendMessage()">Send Message</button>
+        <button onclick="SeenMessage()">Send Read</button>
         <pre id="output"></pre>
     </body>
     <script src="https://cdn.rawgit.com/CryptoStore/crypto-js/3.1.2/build/rollups/aes.js"></script>
@@ -28,6 +29,7 @@
     var number= document.getElementById("Number");
     var password = document.getElementById("Password");
     var socket =  io();
+    var messages = null
     var localUser = null
     var token=""
     var generalKey = ""
@@ -54,6 +56,9 @@
     socket.on("Log In",function(encryptedUser){
             localUser = decryptText(encryptedUser,WSKey)
             output.innerHTML+= `I'm ${JSON.stringify(localUser,null, 2)}\n`
+
+
+            socket.emit("GetCurrentGroups")
     })
 
     socket.on("WSKey",function(key){
@@ -80,17 +85,22 @@
 
     socket.on("History",function(encryptedHistory){
         let history = decryptText(encryptedHistory,WSKey)
+        messages = history
         output.innerHTML+=`Messages History:\n ${JSON.stringify(history,null, 2)}\n`
     })
     socket.on("NewMessage",function(encryptedmessage){
         let message = decryptText(encryptedmessage,WSKey)
-        alert(JSON.stringify(message,null, 2))
         output.innerHTML+=`New message is ${JSON.stringify(message,null, 2)}\n`
     })
 
     socket.on("NewGroup",function(encryptedgroup){
         let group = decryptText(encryptedgroup,WSKey)
         output.innerHTML+=` I was joined to a new group: ${JSON.stringify(group,null, 2)}\n`
+    })
+
+    socket.on("ReadedMessage",function(encryptedMessage){
+        let updatedMessage = decryptText(encryptedMessage,WSKey)
+        output.innerHTML+=` SomeOne read this message: ${JSON.stringify(updatedMessage,null, 2)}\n`
     })
 
     socket.on("SendedMessage",function(encryptedMessage){
@@ -162,6 +172,12 @@
         socket.emit("sendMessage",encryptObject({content:"Hola! perro pelon :D",from:localUser,to:[{zone:"+506",number:"62073447"}]},WSKey))
     }
 
+    function SeenMessage (){
+
+       let message = messages.filter(x=>x.IsRead==false)[0]
+        socket.emit("SendSeen",encryptObject(message.ID,WSKey))
+    }
+
     function decryptText(encryptedText,key){
         let plain = CryptoJS.AES.decrypt(encryptedText,key,
                                             { iv: iv,
@@ -171,8 +187,12 @@
         return result
     }
     function encryptObject(object,key){
-        let content =  JSON.stringify(object)
-        let encryptedObject = CryptoJS.AES.encrypt(content,
+        if(typeof object != "string" )
+           object =  JSON.stringify(object)
+        else
+            object = object
+
+        let encryptedObject = CryptoJS.AES.encrypt(object,
                                             key,
                                             { iv: iv,
                                               mode: CryptoJS.mode.CBC,
