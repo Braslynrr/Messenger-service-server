@@ -55,7 +55,7 @@ func GetAllGroups(user *user.User) (groups []group.Group, err error) {
 	return
 }
 
-// GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
+// GetGroupHistory gets the last messages with a maximun of 20 messages usincg a date as reference
 func GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
 	dbs, err := dbservice.NewDBService()
 	if err == nil {

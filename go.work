@@ -11,7 +11,7 @@ use (
 	./Logic/MessengerManager
 	./Logic/UserManager
 	./Model/Group
-	./Model/User
 	./Model/Message
+	./Model/User
 	./Utils
 )
