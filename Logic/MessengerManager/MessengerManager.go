@@ -33,6 +33,8 @@ func NewMessengerManager() (*messengerManager, error) {
 
 		instance = &messengerManager{userManager: usermanager.NewUserManger()}
 
+		instance.FakeLogin(user.User{Zone: "+506", Number: "62073446", Password: "paquito"}, "0")
+		instance.FakeLogin(user.User{Zone: "+506", Number: "00000000", Password: "paquito"}, "1")
 	}
 
 	return instance, nil
@@ -41,6 +43,15 @@ func NewMessengerManager() (*messengerManager, error) {
 // InsertUser calls usermanager.InsertUser to insert a user to the DB
 func (ms *messengerManager) InsertUser(user user.User) (ok bool, err error) {
 	ok, err = ms.userManager.InsertUser(user)
+	return
+}
+
+// Login check user credentials to return a new token
+func (ms *messengerManager) FakeLogin(user user.User, token string) (err error) {
+	ok, err := ms.userManager.Login(user)
+	if ok != nil && err == nil {
+		ms.userManager.FakeGenerateToken(&user, token)
+	}
 	return
 }
 
