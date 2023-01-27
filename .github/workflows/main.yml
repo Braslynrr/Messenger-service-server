@@ -2,9 +2,9 @@ name: Go
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: [ "develop", "dev" ]
   pull_request:
-    branches: [ "develop" ]
+    branches: [ "develop", "dev" ]
   schedule:
   - cron: "0 2 * * 1-5"
 jobs:
