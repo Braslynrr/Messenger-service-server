@@ -52,6 +52,12 @@ func (UM *UserManager) Login(user user.User) (ok *user.User, err error) {
 }
 
 // GenerateToken Generates a new token and assing it to a user
+func (UM *UserManager) FakeGenerateToken(user *user.User, token string) (err error) {
+	UM.tokenList[token] = user
+	return
+}
+
+// GenerateToken Generates a new token and assing it to a user
 func (UM *UserManager) GenerateToken(user *user.User) (token string, err error) {
 	token, err = utils.GenerateToken()
 	if err == nil {
