@@ -30,19 +30,21 @@ func NewSocketIo() http.Handler {
 
 		log.Printf("New Connection: %v", client.Id())
 
+		WSKey, err := utils.GenerateRandomAESKey(standarKeySize)
+		if err == nil {
+			client.SetData(WSKey)
+			client.Emit("WSKey", WSKey)
+		}
+
+		HandleError(client, "", err)
 		client.On("messenger", func(data ...any) {
 
-			WSKey, err := utils.GenerateRandomAESKey(standarKeySize)
-			if err == nil {
-				client.SetData(WSKey)
-				token, ok := data[0].(string)
-				if ok {
-					connectToMessengerService(client, token)
-				} else {
-					err = errors.New("object sended is not a token")
-				}
+			token, ok := data[0].(string)
+			if ok {
+				connectToMessengerService(client, token)
+			} else {
+				err = errors.New("object sended is not a token")
 			}
-			HandleError(client, "", err)
 
 		})
 
@@ -90,7 +92,6 @@ func connectToMessengerService(conn *socket.Socket, token string) {
 			user.SetSocketID(conn.Id())
 			conn.SetData(gin.H{"key": AESkey, "user": *user})
 			conn.Join("Online")
-			conn.Emit("WSKey", AESkey)
 			encryptedUser, err = utils.EncryptInterface(user, AESkey)
 			if err != nil {
 				HandleError(conn, "", err)
