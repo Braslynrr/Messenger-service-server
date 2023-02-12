@@ -41,7 +41,12 @@ func NewSocketIo() http.Handler {
 
 			token, ok := data[0].(string)
 			if ok {
-				connectToMessengerService(client, token)
+				context, ok := client.Data().(gin.H)
+				if ok && context["user"] != nil {
+					sendUserInfo(client, nil)
+				} else {
+					connectToMessengerService(client, token)
+				}
 			} else {
 				err = errors.New("object sended is not a token")
 			}
@@ -82,7 +87,7 @@ func HandleError(conn *socket.Socket, errortype string, err error) {
 // ConnectToMessengerService connects a user to Online channel using a token
 func connectToMessengerService(conn *socket.Socket, token string) {
 	var err error
-	var encryptedUser string
+
 	MS, err := messengermanager.NewMessengerManager()
 	if err == nil {
 		token := fmt.Sprintf("%v", token)
@@ -92,18 +97,31 @@ func connectToMessengerService(conn *socket.Socket, token string) {
 			user.SetSocketID(conn.Id())
 			conn.SetData(gin.H{"key": AESkey, "user": *user})
 			conn.Join("Online")
-			encryptedUser, err = utils.EncryptInterface(user, AESkey)
-			if err != nil {
-				HandleError(conn, "", err)
-				return
-
-			}
-			conn.Emit("Log In", encryptedUser)
-
+			sendUserInfo(conn, user)
 			return
 		}
 	}
 	HandleError(conn, "", err)
+}
+
+func sendUserInfo(conn *socket.Socket, connUser *user.User) {
+	var encryptedUser string
+	var err error
+	context, ok := conn.Data().(gin.H)
+	if ok {
+		AESkey := fmt.Sprintf("%v", context["key"])
+		if connUser == nil {
+			var CU user.User = context["user"].(user.User)
+			connUser = &CU
+		}
+		encryptedUser, err = utils.EncryptInterface(connUser, AESkey)
+		if err != nil {
+			HandleError(conn, "", err)
+			return
+		}
+	}
+
+	conn.Emit("Log In", encryptedUser)
 }
 
 // sendMessage sends a message to group or chat
