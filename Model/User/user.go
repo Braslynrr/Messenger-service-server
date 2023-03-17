@@ -8,8 +8,8 @@ import (
 )
 
 type User struct {
-	Number   string          `bson:"number"`
-	Zone     string          `bson:"zone"`
+	Number   string          `bson:"number" uri:"number"`
+	Zone     string          `bson:"zone" uri:"zone"`
 	State    string          `bson:"state,omitempty" json:"state,omitempty"`
 	UserName string          `bson:"username,omitempty" json:"username,omitempty"`
 	Password string          `bson:"password,omitempty" json:"password,omitempty"`

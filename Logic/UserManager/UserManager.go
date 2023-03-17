@@ -112,3 +112,14 @@ func (UM *UserManager) SendToNumber(conn *socket.Socket, Channel string, sockets
 	}
 
 }
+
+// GetUser gets an user from DB
+func (UM *UserManager) GetUser(user user.User) (returnedUser *user.User, err error) {
+	dbs, err := dbservice.NewDBService()
+
+	if err == nil {
+		returnedUser, err = dbs.GetUser(user)
+		returnedUser.Password = ""
+	}
+	return
+}
