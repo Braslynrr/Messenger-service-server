@@ -130,3 +130,9 @@ func (ms *messengerManager) MapNumberToSocketID(user *user.User) (numbers map[so
 	numbers = ms.userManager.MapNumbersToSocketID([]string{user.Zone + user.Number})
 	return
 }
+
+// GetUser gets an user from userManager
+func (ms *messengerManager) GetUser(user user.User) (returneduser *user.User, err error) {
+	returneduser, err = ms.userManager.GetUser(user)
+	return
+}

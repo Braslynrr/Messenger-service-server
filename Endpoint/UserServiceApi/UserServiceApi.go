@@ -1,6 +1,7 @@
 package userserviceapi
 
 import (
+	"MessengerService/group"
 	messengermanager "MessengerService/mesermanager"
 	"MessengerService/user"
 	"MessengerService/utils"
@@ -100,4 +101,49 @@ func Login(c *gin.Context) {
 		}
 	}
 	c.IndentedJSON(http.StatusNotAcceptable, gin.H{"error": err.Error()})
+}
+
+// GetUser Gets an user by its zone and number
+func GetUser(c *gin.Context) {
+	var tempUser *user.User
+	var err error
+
+	if err = c.ShouldBindUri(&tempUser); err == nil {
+
+		messman, mmerr := messengermanager.NewMessengerManager()
+
+		if mmerr == nil {
+			tempUser, err = messman.GetUser(*tempUser)
+			if err == nil {
+				c.IndentedJSON(http.StatusOK, tempUser)
+				return
+			}
+		} else {
+			err = mmerr
+		}
+	}
+	c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err})
+}
+
+// GetGroups Gets groups by user
+func GetGroups(c *gin.Context) {
+	var tempUser *user.User
+	var grouplist []group.Group
+	var err error
+
+	if err = c.ShouldBindUri(&tempUser); err == nil {
+
+		messman, mmerr := messengermanager.NewMessengerManager()
+
+		if mmerr == nil {
+			grouplist, err = messman.GetAllGroups(*tempUser)
+			if err == nil {
+				c.IndentedJSON(http.StatusOK, grouplist)
+				return
+			}
+		} else {
+			err = mmerr
+		}
+	}
+	c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err})
 }

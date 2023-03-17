@@ -19,6 +19,8 @@ func main() {
 	router.GET("/Key", messengerserviceapi.GetKey)
 	router.POST("/User", userserviceapi.NewUser)
 	router.POST("/User/Login", userserviceapi.Login)
+	router.GET("/User/:zone/:number", userserviceapi.GetUser)
+	router.GET("/Groups/:zone/:number", userserviceapi.GetGroups)
 
 	handler := messengerserviceapi.NewSocketIo()
 
