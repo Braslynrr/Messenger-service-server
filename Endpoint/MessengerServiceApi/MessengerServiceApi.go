@@ -38,12 +38,14 @@ func NewSocketIo() http.Handler {
 
 		HandleError(client, "", err)
 		client.On("messenger", func(data ...any) {
-
-			token, ok := data[0].(string)
-			if ok {
-				context, ok := client.Data().(gin.H)
-				if ok && context["user"] != nil {
-					sendUserInfo(client, nil)
+			var err error
+			var WSKey string
+			WSKey, err = utils.GenerateRandomAESKey(standarKeySize)
+			if err == nil {
+				client.SetData(WSKey)
+				token, ok := data[0].(string)
+				if ok {
+					connectToMessengerService(client, token)
 				} else {
 					connectToMessengerService(client, token)
 				}
@@ -87,11 +89,12 @@ func HandleError(conn *socket.Socket, errortype string, err error) {
 // ConnectToMessengerService connects a user to Online channel using a token
 func connectToMessengerService(conn *socket.Socket, token string) {
 	var err error
+	var user *user.User
 
 	MS, err := messengermanager.NewMessengerManager()
 	if err == nil {
 		token := fmt.Sprintf("%v", token)
-		user, err := MS.HasTokenAccess(token)
+		user, err = MS.HasTokenAccess(token)
 		if err == nil {
 			AESkey := fmt.Sprintf("%v", conn.Data())
 			user.SetSocketID(conn.Id())
