@@ -6,6 +6,7 @@ import (
 	"MessengerService/user"
 	"MessengerService/utils"
 	"errors"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zishang520/socket.io/socket"
@@ -62,6 +63,13 @@ func (UM *UserManager) GenerateToken(user *user.User) (token string, err error) 
 	token, err = utils.GenerateToken()
 	if err == nil {
 		UM.tokenList[token] = user
+		ticker := time.NewTicker(5 * time.Second)
+
+		go func() {
+			for range ticker.C {
+				delete(UM.tokenList, token)
+			}
+		}()
 	}
 	return
 }
@@ -72,6 +80,7 @@ func (UM *UserManager) ProcessToken(token string) (*user.User, error) {
 		UM.UserList[user.Zone+user.Number] = user
 		return user, nil
 	}
+
 	return nil, errors.New("invalid token")
 }
 
