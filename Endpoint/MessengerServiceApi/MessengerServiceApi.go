@@ -39,14 +39,11 @@ func NewSocketIo() http.Handler {
 		HandleError(client, "", err)
 		client.On("messenger", func(data ...any) {
 			var err error
-			var WSKey string
-			WSKey, err = utils.GenerateRandomAESKey(standarKeySize)
+
 			if err == nil {
-				client.SetData(WSKey)
+
 				token, ok := data[0].(string)
 				if ok {
-					connectToMessengerService(client, token)
-				} else {
 					connectToMessengerService(client, token)
 				}
 			} else {
@@ -100,7 +97,7 @@ func connectToMessengerService(conn *socket.Socket, token string) {
 			user.SetSocketID(conn.Id())
 			conn.SetData(gin.H{"key": AESkey, "user": *user})
 			conn.Join("Online")
-			sendUserInfo(conn, user)
+			conn.Emit("Log In", user)
 			return
 		}
 	}
@@ -152,7 +149,6 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 				if len(toList) > 0 {
 
 					if err == nil {
-
 						var encryptedInterface string
 						var groupID primitive.ObjectID
 						var sockets map[socket.SocketId]bool
@@ -166,10 +162,9 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 							groupID, err = MS.CreateGroup(user, toList)
 							if err == nil {
 								group, _ := MS.GetGroup(groupID)
-								encryptedInterface, err = utils.EncryptInterface(group, context["key"].(string))
-								if err == nil {
-									conn.Emit("NewGroup", encryptedInterface)
-								}
+
+								conn.Emit("NewGroup", group)
+
 							}
 						}
 
@@ -204,36 +199,30 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 }
 
 // getGroupHistory returns a list of 10 last messages using a date
-func getGroupHistory(conn *socket.Socket, decryptedmessage string) (err error) {
+func getGroupHistory(conn *socket.Socket, groupInfo map[string]any) (err error) {
 	context := conn.Data().(gin.H)
 	var ID primitive.ObjectID
 	var history []*msmessage.Message
 	var mTime time.Time
-	var info map[string]any
+	var encryptedmessage string
 
-	decryptedmessage, err = utils.DecryptText(decryptedmessage, context["key"].(string))
+	MS, err1 := messengermanager.NewMessengerManager()
+	err = err1
 	if err == nil {
-		err = json.Unmarshal([]byte(decryptedmessage), &info)
+		ID, err = primitive.ObjectIDFromHex(groupInfo["ID"].(string))
 		if err == nil {
-			MS, err1 := messengermanager.NewMessengerManager()
-			err = err1
+			mTime, err = time.Parse(time.RFC3339, groupInfo["time"].(string))
 			if err == nil {
-				ID, err = primitive.ObjectIDFromHex(info["ID"].(string))
+				history, err = MS.GetGroupHistory(ID, mTime)
 				if err == nil {
-					mTime, err = time.Parse(time.RFC3339, info["time"].(string))
+					for _, msg := range history {
+						user := context["user"].(user.User)
+						msg.WillSendtoUser(&user)
+					}
+					// re-using variable to encrypt
+					encryptedmessage, err = utils.EncryptInterface(history, context["key"].(string))
 					if err == nil {
-						history, err = MS.GetGroupHistory(ID, mTime)
-						if err == nil {
-							for _, msg := range history {
-								user := context["user"].(user.User)
-								msg.WillSendtoUser(&user)
-							}
-							// re-using variable to encrypt
-							decryptedmessage, err = utils.EncryptInterface(history, context["key"].(string))
-							if err == nil {
-								conn.Emit("History", decryptedmessage)
-							}
-						}
+						conn.Emit("History", encryptedmessage)
 					}
 				}
 			}
@@ -244,27 +233,23 @@ func getGroupHistory(conn *socket.Socket, decryptedmessage string) (err error) {
 }
 
 // seenMessage mark as Read a message by this connection user
-func seenMessage(conn *socket.Socket, decryptedmessage string) (err error) {
+func seenMessage(conn *socket.Socket, ID primitive.ObjectID) (err error) {
 	context := conn.Data().(gin.H)
-	var ID primitive.ObjectID
 	var message msmessage.Message
 	var localUser user.User = context["user"].(user.User)
+	var decryptedmessage string
 
-	decryptedmessage, err = utils.DecryptText(decryptedmessage, context["key"].(string))
+	MS, err1 := messengermanager.NewMessengerManager()
+	err = err1
 	if err == nil {
-		MS, err1 := messengermanager.NewMessengerManager()
-		err = err1
+		ID, err = primitive.ObjectIDFromHex(decryptedmessage)
 		if err == nil {
-			ID, err = primitive.ObjectIDFromHex(decryptedmessage)
+			message, err = MS.MessageWasSeenBy(ID, localUser)
 			if err == nil {
-				message, err = MS.MessageWasSeenBy(ID, localUser)
-				if err == nil {
-					if !message.From.IsEqual(&localUser) {
-						message.WillSendtoUser(message.From)
-						socket := MS.MapNumberToSocketID(message.From)
-						MS.SendToNumber(conn, "ReadedMessage", socket, &message)
-					}
-
+				if !message.From.IsEqual(&localUser) {
+					message.WillSendtoUser(message.From)
+					socket := MS.MapNumberToSocketID(message.From)
+					MS.SendToNumber(conn, "ReadedMessage", socket, &message)
 				}
 
 			}
@@ -305,28 +290,22 @@ func GetGroups(conn *socket.Socket) (err error) {
 		if err == nil {
 			var groups []group.Group
 			groups, err = MS.GetAllGroups(*user)
-			if err == nil {
-				var encryptedGroups string
-				context := conn.Data().(gin.H)
-				encryptedGroups, err = utils.EncryptInterface(groups, context["key"].(string))
-				if err == nil {
-					conn.Emit("AllCurrentGroups", encryptedGroups)
-				}
-			}
 
+			conn.Emit("AllCurrentGroups", groups)
 		}
+
 	}
 	HandleError(conn, "", err)
 	return
 }
 
 // HasUserMiddleware checks if user is loged in
-func HasUserMiddleware(conn *socket.Socket, next func(*socket.Socket, string) error, args ...any) (err error) {
+func HasUserMiddleware[T any](conn *socket.Socket, next func(*socket.Socket, T) error, args ...any) (err error) {
 
 	context := conn.Data()
 	contextMap, ok := context.(gin.H)
 	if ok {
-		arg, ok := args[0].(string)
+		arg, ok := args[0].(T)
 		if ok && contextMap["user"] != nil {
 
 			return next(conn, arg)

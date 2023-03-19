@@ -36,6 +36,30 @@ var (
 
 var lock = &sync.Mutex{}
 
+func MongoClient() *mongo.Collection {
+
+	content, err := os.ReadFile(passwordFile)
+	if err != nil {
+		return nil
+	}
+	var password map[string]string
+	err = json.Unmarshal(content, &password)
+
+	mongoOptions := options.Client().ApplyURI(fmt.Sprintf(mongoLink, password["password"]))
+	client, err := mongo.NewClient(mongoOptions)
+	if err != nil {
+		return nil
+	}
+
+	if err := client.Connect(context.Background()); err != nil {
+		return nil
+	}
+
+	c := client.Database("Messenger").Collection("sessions")
+
+	return c
+}
+
 // NewDBService creates a unique dbservice instance
 func NewDBService() (*dbService, error) {
 	lock.Lock()

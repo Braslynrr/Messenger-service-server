@@ -53,11 +53,8 @@
 
 
 
-    socket.on("Log In",function(encryptedUser){
-            localUser = decryptText(encryptedUser,WSKey)
+    socket.on("Log In",function(localUser){
             output.innerHTML+= `I'm ${JSON.stringify(localUser,null, 2)}\n`
-
-
             socket.emit("GetCurrentGroups")
     })
 
@@ -74,12 +71,10 @@
             }
         
     })
-    socket.on("AllCurrentGroups",function(encryptedchats){
-        let chats = decryptText(encryptedchats,WSKey) 
+    socket.on("AllCurrentGroups",function(chats){
         output.innerHTML+=`My chats are\n${JSON.stringify(chats,null, 2)}\n`
         for(let group of chats){
-            let groupHistory =  encryptObject({ID:group.ID,time:new Date()},WSKey)
-            socket.emit("GroupHistory",groupHistory)
+            socket.emit("GroupHistory", {ID:group.ID,time:new Date()})
         }
     })
 
@@ -129,7 +124,7 @@
             },
 
             //make sure to serialize your JSON body
-            body: encryptObject(user,generalKey) 
+            body: JSON.stringify(user) 
             })
             
         if(response.status==200){
@@ -145,7 +140,7 @@
             number: number.value,
             password: password.value
             }
-        let enc=encryptObject(user,generalKey)
+
         let response = await fetch("http://localhost:8080/User/Login",{
             method: "post",
             headers: {
@@ -153,7 +148,7 @@
                 'Content-Type': 'application/json'
             },
             //make sure to serialize your JSON body
-            body: enc})
+            body: JSON.stringify(user)})
 
         let data = await response.json()
         if(response.status==200){
@@ -175,7 +170,7 @@
     function SeenMessage (){
 
        let message = messages.filter(x=>x.IsRead==false)[0]
-        socket.emit("SendSeen",encryptObject(message.ID,WSKey))
+        socket.emit("SendSeen", message.ID)
     }
 
     function decryptText(encryptedText,key){
