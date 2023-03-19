@@ -1,6 +1,6 @@
 module MessengerService/main
 
-go 1.18
+go 1.20
 
 require (
 	github.com/gin-contrib/sessions v0.0.5

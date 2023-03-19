@@ -1,6 +1,6 @@
 module MessengerService/user
 
-go 1.18
+go 1.20
 
 require github.com/zishang520/socket.io v1.0.20
 
