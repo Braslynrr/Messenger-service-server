@@ -1,13 +1,18 @@
 package utils
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"io/ioutil"
+	"net/http"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
 	"github.com/zenazn/pkcs7pad"
 )
 
@@ -104,4 +109,59 @@ func EncryptInterface(something any, key string) (encrypted string, err error) {
 	}
 	base64Text := base64.StdEncoding.EncodeToString(bytes)
 	return base64Text, err
+}
+
+// EncryptMiddleWare encrypts the body before send it
+func EncryptMiddleWare(EncryptedEnabled bool) gin.HandlerFunc {
+	return func(ctx *gin.Context) { // pending to fix
+		if EncryptedEnabled {
+
+			ctx.Done()
+
+			requestBody, err := ioutil.ReadAll(ctx.Request.Response.Body)
+
+			if err != nil {
+				ctx.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+
+			session := sessions.Default(ctx)
+
+			key := session.Get("key").(string)
+
+			encryptedBody, err := encrypt_aes_cbc(requestBody, []byte(key))
+
+			newBody := base64.StdEncoding.EncodeToString(encryptedBody)
+
+			ctx.Request.Body = ioutil.NopCloser(bytes.NewReader([]byte(newBody)))
+
+		}
+		ctx.Next()
+	}
+}
+
+// EncryptMiddleWare encrypts the body before send it
+func DecryptMiddleWare(EncryptedEnabled bool) gin.HandlerFunc {
+	return func(ctx *gin.Context) { // pending to fix
+		if EncryptedEnabled {
+			encryptedBody, err := ioutil.ReadAll(ctx.Request.Body)
+
+			if err != nil {
+				ctx.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+
+			newBody := base64.StdEncoding.EncodeToString(encryptedBody)
+
+			session := sessions.Default(ctx)
+
+			key := session.Get("key").(string)
+
+			decryptedBody, err := decrypt_aes_cbc([]byte(newBody), []byte(key))
+
+			ctx.Request.Body = ioutil.NopCloser(bytes.NewReader([]byte(decryptedBody)))
+
+		}
+		ctx.Next()
+	}
 }
