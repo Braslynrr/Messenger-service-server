@@ -199,41 +199,34 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 }
 
 // getGroupHistory returns a list of 10 last messages using a date
-func getGroupHistory(conn *socket.Socket, info any) (err error) {
+func getGroupHistory(conn *socket.Socket, groupInfo map[string]any) (err error) {
 	context := conn.Data().(gin.H)
 	var ID primitive.ObjectID
-	var groupInfo map[string]any
 	var history []*msmessage.Message
 	var mTime time.Time
 	var encryptedmessage string
 
-	groupInfo, ok := info.(map[string]any)
-	if ok {
-		MS, err1 := messengermanager.NewMessengerManager()
-		err = err1
+	MS, err1 := messengermanager.NewMessengerManager()
+	err = err1
+	if err == nil {
+		ID, err = primitive.ObjectIDFromHex(groupInfo["ID"].(string))
 		if err == nil {
-			ID, err = primitive.ObjectIDFromHex(groupInfo["ID"].(string))
+			mTime, err = time.Parse(time.RFC3339, groupInfo["time"].(string))
 			if err == nil {
-				mTime, err = time.Parse(time.RFC3339, groupInfo["time"].(string))
+				history, err = MS.GetGroupHistory(ID, mTime)
 				if err == nil {
-					history, err = MS.GetGroupHistory(ID, mTime)
+					for _, msg := range history {
+						user := context["user"].(user.User)
+						msg.WillSendtoUser(&user)
+					}
+					// re-using variable to encrypt
+					encryptedmessage, err = utils.EncryptInterface(history, context["key"].(string))
 					if err == nil {
-						for _, msg := range history {
-							user := context["user"].(user.User)
-							msg.WillSendtoUser(&user)
-						}
-						// re-using variable to encrypt
-						encryptedmessage, err = utils.EncryptInterface(history, context["key"].(string))
-						if err == nil {
-							conn.Emit("History", encryptedmessage)
-						}
+						conn.Emit("History", encryptedmessage)
 					}
 				}
 			}
 		}
-
-	} else {
-		err = errors.New("Param is not valid")
 	}
 
 	return
@@ -307,7 +300,7 @@ func GetGroups(conn *socket.Socket) (err error) {
 }
 
 // HasUserMiddleware checks if user is loged in
-func HasUserMiddleware[T comparable](conn *socket.Socket, next func(*socket.Socket, T) error, args ...any) (err error) {
+func HasUserMiddleware[T any](conn *socket.Socket, next func(*socket.Socket, T) error, args ...any) (err error) {
 
 	context := conn.Data()
 	contextMap, ok := context.(gin.H)
