@@ -15,6 +15,7 @@ import (
 
 type messengerManager struct {
 	userManager *usermanager.UserManager
+	Keys        map[string]string
 }
 
 // singleton instance
@@ -31,7 +32,7 @@ func NewMessengerManager() (*messengerManager, error) {
 
 	if instance == nil {
 
-		instance = &messengerManager{userManager: usermanager.NewUserManger()}
+		instance = &messengerManager{userManager: usermanager.NewUserManger(), Keys: map[string]string{}}
 
 		instance.FakeLogin(user.User{Zone: "+506", Number: "62073446", Password: "paquito"}, "0")
 		instance.FakeLogin(user.User{Zone: "+506", Number: "00000000", Password: "paquito"}, "1")

@@ -30,48 +30,50 @@ func NewSocketIo() http.Handler {
 
 		log.Printf("New Connection: %v", client.Id())
 
-		WSKey, err := utils.GenerateRandomAESKey(standarKeySize)
-		if err == nil {
-			client.SetData(WSKey)
+		WSKey := client.Conn().Request().Request().Header.Get("wskey")
+
+		if WSKey == "" {
+
 			client.Emit("WSKey", WSKey)
-		}
+			client.SetData(WSKey)
+			client.On("messenger", func(data ...any) {
+				var err error
 
-		HandleError(client, "", err)
-		client.On("messenger", func(data ...any) {
-			var err error
+				if err == nil {
 
-			if err == nil {
-
-				token, ok := data[0].(string)
-				if ok {
-					connectToMessengerService(client, token)
+					token, ok := data[0].(string)
+					if ok {
+						connectToMessengerService(client, token)
+					}
+				} else {
+					err = errors.New("object sended is not a token")
 				}
-			} else {
-				err = errors.New("object sended is not a token")
-			}
 
-		})
+			})
 
-		client.On("sendMessage", func(message ...any) {
+			client.On("sendMessage", func(message ...any) {
 
-			HandleError(client, "", HasUserMiddleware(client, sendMessage, message...))
-		})
+				HandleError(client, "", HasUserMiddleware(client, sendMessage, message...))
+			})
 
-		client.On("GetCurrentGroups", func(...any) {
-			HandleError(client, "", HasUserMiddlewareNoParam(client, GetGroups))
-		})
+			client.On("GetCurrentGroups", func(...any) {
+				HandleError(client, "", HasUserMiddlewareNoParam(client, GetGroups))
+			})
 
-		client.On("GroupHistory", func(history ...any) {
-			HandleError(client, "", HasUserMiddleware(client, getGroupHistory, history...))
-		})
+			client.On("GroupHistory", func(history ...any) {
+				HandleError(client, "", HasUserMiddleware(client, getGroupHistory, history...))
+			})
 
-		client.On("SendSeen", func(SeenMesage ...any) {
-			HandleError(client, "", HasUserMiddleware(client, seenMessage, SeenMesage...))
-		})
+			client.On("SendSeen", func(SeenMesage ...any) {
+				HandleError(client, "", HasUserMiddleware(client, seenMessage, SeenMesage...))
+			})
 
-		client.On("disconnect", func(reason ...any) {
-			log.Print(reason)
-		})
+			client.On("disconnect", func(reason ...any) {
+				log.Print(reason)
+			})
+		} else {
+			client.Conn().Close(true)
+		}
 	})
 	return serverIO.ServeHandler(nil)
 }
@@ -260,7 +262,7 @@ func seenMessage(conn *socket.Socket, ID primitive.ObjectID) (err error) {
 
 // GetPage Return the Test page
 func GetPage(c *gin.Context) {
-	c.HTML(200, "websockets.html", nil)
+	c.File("../../ServerFiles/html/websockets.html")
 }
 
 // returns a key generated on GetPage
@@ -327,4 +329,23 @@ func HasUserMiddlewareNoParam(conn *socket.Socket, next func(*socket.Socket) err
 	}
 
 	return errors.New("connection has done an invalid action due to should log in")
+}
+
+// SetContextID set token for session
+func SetContextID(ctx *gin.Context) { // pending to fix
+
+	sessionID, err := ctx.Cookie("session_id")
+
+	if err != nil || sessionID == "" {
+		sessionID, err = utils.GenerateToken()
+		ctx.SetCookie("session_id", sessionID, 0, "", "", false, true)
+
+		session := sessions.Default(ctx)
+		session.Set("session_id", sessionID)
+		session.Save()
+
+		defer session.Save()
+	}
+
+	ctx.Next()
 }

@@ -28,7 +28,7 @@
     var zone = document.getElementById("Zone");
     var number= document.getElementById("Number");
     var password = document.getElementById("Password");
-    var socket =  io();
+    var socket = null;
     var messages = null
     var localUser = null
     var token="1"
@@ -43,70 +43,72 @@
                 'Content-Type': 'application/json'
             }})
         let data = await response.json()
-        output.innerHTML +="my Key for Normal request is" + data.initialValue+"\n"
+        output.innerHTML +="my Key for Normal request is " + data.initialValue+"\n"
         generalKey= CryptoJS.enc.Hex.parse(data.initialValue)
-    }  
+    
+        socket =  io();
 
-    socket.on('connect', function(){ 
+        socket.on('connect', function(){ 
             output.innerHTML+=`Now Im Connected\n`
          });
 
 
+        socket.on("Log In",function(localUser){
+                output.innerHTML+= `I'm ${JSON.stringify(localUser,null, 2)}\n`
+                socket.emit("GetCurrentGroups")
+        })
 
-    socket.on("Log In",function(localUser){
-            output.innerHTML+= `I'm ${JSON.stringify(localUser,null, 2)}\n`
-            socket.emit("GetCurrentGroups")
-    })
+        socket.on("WSKey",function(key){
+                WSKey= CryptoJS.enc.Hex.parse(key)
+                output.innerHTML+=`My key to Handle encrypted messages is ${key}\n`
+        })
 
-    socket.on("WSKey",function(key){
-            WSKey= CryptoJS.enc.Hex.parse(key)
-            output.innerHTML+=`My key to Handle encrypted messages is ${key}\n`
-    })
+        socket.on("error",function(error){
+                if('error' in error){
+                    output.innerHTML+= `I received a new server error: ${JSON.stringify(error.error)}\n`
+                }else{
+                    output.innerHTML+= `I received a Connection error: ${JSON.stringify(error)}\n`
+                }
+            
+        })
+        socket.on("AllCurrentGroups",function(chats){
+            output.innerHTML+=`My chats are\n${JSON.stringify(chats,null, 2)}\n`
+            for(let group of chats){
+                socket.emit("GroupHistory", {ID:group.ID,time:new Date()})
+            }
+        })
 
-    socket.on("error",function(error){
-            if('error' in error){
-                output.innerHTML+= `I received a new server error: ${JSON.stringify(error.error)}\n`
+        socket.on("History",function(encryptedHistory){
+            let history = decryptText(encryptedHistory,WSKey)
+            messages = history
+            output.innerHTML+=`Messages History:\n ${JSON.stringify(history,null, 2)}\n`
+        })
+        socket.on("NewMessage",function(encryptedmessage){
+            let message = decryptText(encryptedmessage,WSKey)
+            output.innerHTML+=`New message is ${JSON.stringify(message,null, 2)}\n`
+        })
+
+        socket.on("NewGroup",function(encryptedgroup){
+            let group = decryptText(encryptedgroup,WSKey)
+            output.innerHTML+=` I was joined to a new group: ${JSON.stringify(group,null, 2)}\n`
+        })
+
+        socket.on("ReadedMessage",function(encryptedMessage){
+            let updatedMessage = decryptText(encryptedMessage,WSKey)
+            output.innerHTML+=` SomeOne read this message: ${JSON.stringify(updatedMessage,null, 2)}\n`
+        })
+
+        socket.on("SendedMessage",function(encryptedMessage){
+            let message = decryptText(encryptedMessage,WSKey)
+            if(message.ok){
+                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was correctly sended\n`
             }else{
-                output.innerHTML+= `I received a Connection error: ${JSON.stringify(error)}\n`
+                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message wasnt sended\n`
             }
         
-    })
-    socket.on("AllCurrentGroups",function(chats){
-        output.innerHTML+=`My chats are\n${JSON.stringify(chats,null, 2)}\n`
-        for(let group of chats){
-            socket.emit("GroupHistory", {ID:group.ID,time:new Date()})
-        }
-    })
+        })
+    }  
 
-    socket.on("History",function(encryptedHistory){
-        let history = decryptText(encryptedHistory,WSKey)
-        messages = history
-        output.innerHTML+=`Messages History:\n ${JSON.stringify(history,null, 2)}\n`
-    })
-    socket.on("NewMessage",function(encryptedmessage){
-        let message = decryptText(encryptedmessage,WSKey)
-        output.innerHTML+=`New message is ${JSON.stringify(message,null, 2)}\n`
-    })
-
-    socket.on("NewGroup",function(encryptedgroup){
-        let group = decryptText(encryptedgroup,WSKey)
-        output.innerHTML+=` I was joined to a new group: ${JSON.stringify(group,null, 2)}\n`
-    })
-
-    socket.on("ReadedMessage",function(encryptedMessage){
-        let updatedMessage = decryptText(encryptedMessage,WSKey)
-        output.innerHTML+=` SomeOne read this message: ${JSON.stringify(updatedMessage,null, 2)}\n`
-    })
-
-    socket.on("SendedMessage",function(encryptedMessage){
-        let message = decryptText(encryptedMessage,WSKey)
-        if(message.ok){
-            output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was correctly sended\n`
-        }else{
-            output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message wasnt sended\n`
-        }
-       
-    })
 
     async function addUser(){
         let user = {

@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/gin-contrib/sessions v0.0.5
 	github.com/gin-gonic/gin v1.8.1
+	github.com/go-playground/assert v1.2.1
 	github.com/rs/cors/wrapper/gin v0.0.0-20221003140808-fcebdb403f4d
 )
 
