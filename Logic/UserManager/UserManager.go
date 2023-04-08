@@ -2,13 +2,11 @@ package usermanager
 
 import (
 	"MessengerService/dbservice"
-	"MessengerService/message"
 	"MessengerService/user"
 	"MessengerService/utils"
 	"errors"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/zishang520/socket.io/socket"
 )
 
@@ -93,24 +91,6 @@ func (UM *UserManager) MapNumbersToSocketID(numbers []string) (numberMap map[soc
 		}
 	}
 	return numberMap
-}
-
-// send new message to a group of numbers online
-func (UM *UserManager) SendToNumber(conn *socket.Socket, Channel string, sockets map[socket.SocketId]bool, message *message.Message) {
-
-	onlineSockets := conn.To("Online").FetchSockets()
-
-	for _, socket := range onlineSockets {
-
-		if sockets[socket.Id()] {
-			usercontext := socket.Data().(gin.H)
-			encyptedMessage, err := utils.EncryptInterface(message, usercontext["key"].(string))
-			if err == nil {
-				socket.Emit(Channel, encyptedMessage)
-			}
-		}
-	}
-
 }
 
 // GetUser gets an user from DB
