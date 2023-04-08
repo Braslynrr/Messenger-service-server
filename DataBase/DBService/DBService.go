@@ -19,7 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type dbService struct {
+type DbService struct {
 	connectionLink string
 	dbclient       *mongo.Client
 	dbcontext      context.Context
@@ -31,37 +31,12 @@ const passwordFile = "../../DataBase/DBService/mongoPassword.json"
 
 // singleton instance
 var (
-	instance *dbService
+	instance *DbService
+	lock     *sync.Mutex = &sync.Mutex{}
 )
 
-var lock = &sync.Mutex{}
-
-func MongoClient() *mongo.Collection {
-
-	content, err := os.ReadFile(passwordFile)
-	if err != nil {
-		return nil
-	}
-	var password map[string]string
-	err = json.Unmarshal(content, &password)
-
-	mongoOptions := options.Client().ApplyURI(fmt.Sprintf(mongoLink, password["password"]))
-	client, err := mongo.NewClient(mongoOptions)
-	if err != nil {
-		return nil
-	}
-
-	if err := client.Connect(context.Background()); err != nil {
-		return nil
-	}
-
-	c := client.Database("Messenger").Collection("sessions")
-
-	return c
-}
-
 // NewDBService creates a unique dbservice instance
-func NewDBService() (*dbService, error) {
+func NewDBService() (*DbService, error) {
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -77,14 +52,41 @@ func NewDBService() (*dbService, error) {
 		if err != nil {
 			return nil, err
 		}
-		instance = &dbService{connectionLink: fmt.Sprintf(mongoLink, password["password"])}
+		instance = &DbService{connectionLink: fmt.Sprintf(mongoLink, password["password"])}
 	}
 
 	return instance, nil
 }
 
+func MongoClient() *mongo.Collection {
+
+	content, err := os.ReadFile(passwordFile)
+	if err != nil {
+		return nil
+	}
+	var password map[string]string
+	err = json.Unmarshal(content, &password)
+	if err == nil {
+
+		mongoOptions := options.Client().ApplyURI(fmt.Sprintf(mongoLink, password["password"]))
+		client, err := mongo.NewClient(mongoOptions)
+		if err != nil {
+			return nil
+		}
+
+		if err := client.Connect(context.Background()); err != nil {
+			return nil
+		}
+
+		c := client.Database("Messenger").Collection("sessions")
+
+		return c
+	}
+	return nil
+}
+
 // connect connects to the DB
-func (dbs *dbService) connect() (err error) {
+func (dbs *DbService) connect() (err error) {
 
 	dbs.dbcontext, dbs.dbdisconnect = context.WithTimeout(context.Background(), 30*time.Second)
 	dbs.dbclient, err = mongo.Connect(dbs.dbcontext, options.Client().ApplyURI(dbs.connectionLink))
@@ -92,7 +94,7 @@ func (dbs *dbService) connect() (err error) {
 }
 
 // close disconnects to the DB
-func (dbs *dbService) close() error {
+func (dbs *DbService) close() error {
 
 	defer dbs.dbdisconnect()
 
@@ -110,7 +112,7 @@ func (dbs *dbService) close() error {
 }
 
 // InsertUser calls dbuser.InsertUser to insert a user in the DB
-func (dbs dbService) InsertUser(user user.User) (ok bool, err error) {
+func (dbs DbService) InsertUser(user user.User) (ok bool, err error) {
 	err = dbs.connect()
 	user2, err2 := dbuser.GetUser(user, dbs.dbclient, dbs.dbcontext)
 
@@ -124,7 +126,7 @@ func (dbs dbService) InsertUser(user user.User) (ok bool, err error) {
 }
 
 // GetUser gets a user from the DB
-func (dbs dbService) GetUser(localUser user.User) (user *user.User, err error) {
+func (dbs DbService) GetUser(localUser user.User) (user *user.User, err error) {
 	err = dbs.connect()
 
 	if err == nil {
@@ -135,7 +137,7 @@ func (dbs dbService) GetUser(localUser user.User) (user *user.User, err error) {
 }
 
 // Login Checks if one user is registed
-func (dbs dbService) Login(localUser user.User) (user *user.User, err error) {
+func (dbs DbService) Login(localUser user.User) (user *user.User, err error) {
 	err = dbs.connect()
 
 	if err == nil {
@@ -146,7 +148,7 @@ func (dbs dbService) Login(localUser user.User) (user *user.User, err error) {
 }
 
 // CheckGroup checks if chat or group exists
-func (dbs dbService) CheckGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
+func (dbs DbService) CheckGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
 	var groupID any
 	var ok bool
 	user.LeaveMinimalInformation()
@@ -165,7 +167,7 @@ func (dbs dbService) CheckGroup(user *user.User, to []*user.User) (ID primitive.
 }
 
 // CheckGroup creates a new one
-func (dbs dbService) CreateGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
+func (dbs DbService) CreateGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
 	var groupID any
 	var ok bool
 	user.UserName = ""
@@ -186,7 +188,7 @@ func (dbs dbService) CreateGroup(user *user.User, to []*user.User) (ID primitive
 }
 
 // SaveMessage Saves message in the DB
-func (dbs dbService) SaveMessage(message *message.Message) (err error) {
+func (dbs DbService) SaveMessage(message *message.Message) (err error) {
 	err = dbs.connect()
 	if err == nil {
 		err = dbgroup.SaveMessage(message, dbs.dbclient, dbs.dbcontext)
@@ -198,7 +200,7 @@ func (dbs dbService) SaveMessage(message *message.Message) (err error) {
 }
 
 // GetGroup gets a existing group from db
-func (dbs dbService) GetGroup(ID primitive.ObjectID) (group *group.Group, err error) {
+func (dbs DbService) GetGroup(ID primitive.ObjectID) (group *group.Group, err error) {
 	err = dbs.connect()
 	if err == nil {
 		group, err = dbgroup.GetGroup(ID, dbs.dbclient, dbs.dbcontext)
@@ -208,7 +210,7 @@ func (dbs dbService) GetGroup(ID primitive.ObjectID) (group *group.Group, err er
 }
 
 // GetAllGroups return all groups of an user
-func (dbs dbService) GetAllGroups(user *user.User) (groups []group.Group, err error) {
+func (dbs DbService) GetAllGroups(user *user.User) (groups []*group.Group, err error) {
 	err = dbs.connect()
 	if err == nil {
 		user.LeaveMinimalInformation()
@@ -219,7 +221,7 @@ func (dbs dbService) GetAllGroups(user *user.User) (groups []group.Group, err er
 }
 
 // GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference from DB
-func (dbs dbService) GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
+func (dbs DbService) GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
 	err = dbs.connect()
 	if err == nil {
 		history, err = dbgroup.GetGroupHistory(groupID, time, dbs.dbclient, dbs.dbcontext)
@@ -229,7 +231,7 @@ func (dbs dbService) GetGroupHistory(groupID primitive.ObjectID, time time.Time)
 }
 
 // UpdateMessageReadBy calls dbgroup.UpdateMessageReadBy to set user as a reader of message
-func (dbs dbService) UpdateMessageReadBy(messageID primitive.ObjectID, localUser user.User) (message message.Message, err error) {
+func (dbs DbService) UpdateMessageReadBy(messageID primitive.ObjectID, localUser user.User) (message message.Message, err error) {
 	err = dbs.connect()
 	if err == nil {
 		message, err = dbgroup.GetMessage(messageID, dbs.dbclient, dbs.dbcontext)

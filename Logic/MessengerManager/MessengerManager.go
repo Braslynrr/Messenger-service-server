@@ -1,6 +1,7 @@
 package messengermanager
 
 import (
+	"MessengerService/dbservice"
 	"MessengerService/group"
 	"MessengerService/groupmanager"
 	"MessengerService/message"
@@ -14,8 +15,9 @@ import (
 )
 
 type messengerManager struct {
-	userManager *usermanager.UserManager
-	Keys        map[string]string
+	userManager  *usermanager.UserManager
+	groupManager *groupmanager.GroupManager
+	Keys         map[string]string
 }
 
 // singleton instance
@@ -26,19 +28,19 @@ var (
 var lock = &sync.Mutex{}
 
 // NewMessengerManager Creates a unique new instance
-func NewMessengerManager() (*messengerManager, error) {
+func NewMessengerManager(DB dbservice.DbInterface) (*messengerManager, error) {
 	lock.Lock()
 	defer lock.Unlock()
 
 	if instance == nil {
-
-		instance = &messengerManager{userManager: usermanager.NewUserManger(), Keys: map[string]string{}}
-
-		instance.FakeLogin(user.User{Zone: "+506", Number: "62073446", Password: "paquito"}, "0")
-		instance.FakeLogin(user.User{Zone: "+506", Number: "00000000", Password: "paquito"}, "1")
+		instance = &messengerManager{userManager: usermanager.NewUserManger(DB), groupManager: groupmanager.NewGroupManager(DB), Keys: map[string]string{}}
 	}
 
 	return instance, nil
+}
+
+func (ms *messengerManager) IsInitialize() bool {
+	return ms.userManager != nil && ms.groupManager != nil && ms.Keys != nil
 }
 
 // InsertUser calls usermanager.InsertUser to insert a user to the DB
@@ -73,19 +75,19 @@ func (ms *messengerManager) HasTokenAccess(token string) (user *user.User, err e
 
 // CheckGroupc checks if a group already exist
 func (ms *messengerManager) CheckGroup(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
-	groupID, err = groupmanager.CheckGroup(user, to)
+	groupID, err = ms.groupManager.CheckGroup(user, to)
 	return
 }
 
 // CreateGroup create a new group in the DB
 func (ms *messengerManager) CreateGroup(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
-	groupID, err = groupmanager.CreateGroup(user, to)
+	groupID, err = ms.groupManager.CreateGroup(user, to)
 	return
 }
 
 // GetGroup gets a group by its identificator
 func (ms *messengerManager) GetGroup(groupID primitive.ObjectID) (group *group.Group, err error) {
-	group, err = groupmanager.GetGroup(groupID)
+	group, err = ms.groupManager.GetGroup(groupID)
 	return
 }
 
@@ -95,7 +97,7 @@ func (ms *messengerManager) SaveMessage(user *user.User, to []*user.User, messag
 	wait.Add(2)
 	go func() {
 		defer wait.Done()
-		err = groupmanager.SaveMessage(message)
+		err = ms.groupManager.SaveMessage(message)
 	}()
 
 	go func() {
@@ -113,20 +115,20 @@ func (ms *messengerManager) SaveMessage(user *user.User, to []*user.User, messag
 }
 
 // GetAllGroups gets all groups and its member using an user
-func (ms *messengerManager) GetAllGroups(user user.User) (groups []group.Group, err error) {
-	groups, err = groupmanager.GetAllGroups(&user)
+func (ms *messengerManager) GetAllGroups(user user.User) (groups []*group.Group, err error) {
+	groups, err = ms.groupManager.GetAllGroups(&user)
 	return
 }
 
 // GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
 func (ms *messengerManager) GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
-	history, err = groupmanager.GetGroupHistory(groupID, time)
+	history, err = ms.groupManager.GetGroupHistory(groupID, time)
 	return
 }
 
 // MessageWasSeenBy sets a message as senn by user
 func (ms *messengerManager) MessageWasSeenBy(messageID primitive.ObjectID, user user.User) (message message.Message, err error) {
-	message, err = groupmanager.UpdateMessageReadBy(messageID, user)
+	message, err = ms.groupManager.UpdateMessageReadBy(messageID, user)
 	return
 }
 

@@ -77,14 +77,14 @@ func GetUsersFromGroup(members []*user.User, client *mongo.Client, ctx context.C
 }
 
 // GetAllGroups gets all groups and its members
-func GetAllGroups(localuser *user.User, client *mongo.Client, ctx context.Context) (groups []group.Group, err error) {
+func GetAllGroups(localuser *user.User, client *mongo.Client, ctx context.Context) (groups []*group.Group, err error) {
 	collection := client.Database("Messenger").Collection("Messages")
 	cursor, err := collection.Find(ctx, bson.M{"members": bson.M{"$all": bson.A{localuser}}})
 	for cursor.Next(ctx) {
 		memberGroup := &group.Group{}
 		cursor.Decode(memberGroup)
 		memberGroup.Members, err = GetUsersFromGroup(memberGroup.Members, client, ctx)
-		groups = append(groups, *memberGroup)
+		groups = append(groups, memberGroup)
 	}
 
 	return

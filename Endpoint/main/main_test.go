@@ -18,7 +18,7 @@ func TestMain(t *testing.T) {
 		Wait:   &sync.WaitGroup{},
 		Logger: log.Default(),
 	}
-	router := ms.SetupServer(false)
+	router, _ := ms.SetupServer(false)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/", nil)
