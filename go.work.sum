@@ -2,6 +2,7 @@ github.com/go-session/gin-session v3.1.0+incompatible/go.mod h1:NoNTh6/n3uOT4xtI
 github.com/go-session/session v3.1.2+incompatible/go.mod h1:8B3iivBQjrz/JtC68Np2T1yBBLxTan3mn/3OM0CyRt0=
 github.com/gomodule/redigo v2.0.0+incompatible h1:K/R+8tc58AaqLkqG2Ol3Qk+DR/TlNuhuh457pBFPtt0=
 github.com/gookit/color v1.5.0/go.mod h1:43aQb+Zerm/BWh2GnrgOQm7ffz7tvQXEKV6BFMl7wAo=
+github.com/rs/cors/wrapper/gin v0.0.0-20221003140808-fcebdb403f4d/go.mod h1:IqFyM9uAsle0Bd4h2u+28E+Ma2884FPhOsrREy4dj80=
 github.com/ugorji/go v1.2.7 h1:qYhyWUUd6WbiM+C6JZAUkIJt/1WrjzNHY9+KCIjVqTo=
 github.com/zishang520/engine.io v1.2.1/go.mod h1:2GFZaH7ssIBz4qveJ4pbc0BhaDSnTzzMy1B1dWsRLnU=
 github.com/zishang520/socket.io v1.0.17/go.mod h1:Jz5po329ZYNTTXVc6gttWgE0gaY4v1lMjM0EV5TjdJA=

@@ -41,7 +41,9 @@
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
-            }})
+            }
+        })
+
         let data = await response.json()
         output.innerHTML +="my Key for Normal request is " + data.initialValue+"\n"
         generalKey= CryptoJS.enc.Hex.parse(data.initialValue)
@@ -93,17 +95,17 @@
             output.innerHTML+=` I was joined to a new group: ${JSON.stringify(group,null, 2)}\n`
         })
 
-        socket.on("ReadedMessage",function(encryptedMessage){
+        socket.on("ReadMessage",function(encryptedMessage){
             let updatedMessage = decryptText(encryptedMessage,WSKey)
             output.innerHTML+=` SomeOne read this message: ${JSON.stringify(updatedMessage,null, 2)}\n`
         })
 
-        socket.on("SendedMessage",function(encryptedMessage){
+        socket.on("SentMessage",function(encryptedMessage){
             let message = decryptText(encryptedMessage,WSKey)
             if(message.ok){
-                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was correctly sended\n`
+                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was correctly sent\n`
             }else{
-                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message wasnt sended\n`
+                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was not sent\n`
             }
         
         })
@@ -171,7 +173,7 @@
 
     function SeenMessage (){
 
-       let message = messages.filter(x=>x.IsRead==false)[0]
+        let message = messages.filter(x=>x.IsRead==false)[0]
         socket.emit("SendSeen", message.ID)
     }
 

@@ -3,44 +3,49 @@ package main
 import (
 	"MessengerService/dbservice"
 	messengerserviceapi "MessengerService/messengerserviceApi"
-	"MessengerService/userserviceapi"
-	"MessengerService/utils"
-	"net/http"
+	"fmt"
+	"log"
+	"sync"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/mongo/mongodriver"
 	"github.com/gin-gonic/gin"
-	cors "github.com/rs/cors/wrapper/gin"
 )
 
-func SetupServer(IsEncrypted bool) *gin.Engine {
-	router := gin.Default()
-	router.Use(cors.Default())
-
-	client := dbservice.MongoClient()
-	store := mongodriver.NewStore(client, 3600, true, []byte("secret"))
-	router.Use(sessions.Sessions("key", store))
-	router.Use(messengerserviceapi.SetContextID)
-
-	router.GET("/Key", messengerserviceapi.GetKey)
-	router.POST("/User", utils.DecryptMiddleWare(IsEncrypted), userserviceapi.NewUser, utils.EncryptMiddleWare(IsEncrypted))
-	router.POST("/User/Login", utils.DecryptMiddleWare(IsEncrypted), userserviceapi.Login, utils.EncryptMiddleWare(IsEncrypted))
-	router.GET("/User/:zone/:number", userserviceapi.GetUser, utils.EncryptMiddleWare(IsEncrypted))
-	router.GET("/Groups/:zone/:number", userserviceapi.GetGroups, utils.EncryptMiddleWare(IsEncrypted))
-
-	handler := messengerserviceapi.NewSocketIo()
-
-	router.GET("/socket.io/*any", gin.WrapH(handler))
-	router.POST("/socket.io/*any", gin.WrapH(handler))
-
-	router.StaticFS("/static", http.Dir("../../ServerFiles"))
-
-	router.GET("/", messengerserviceapi.GetPage)
-
-	return router
-}
-
 func main() {
-	router := SetupServer(false)
-	router.Run(":8080")
+	var DB *dbservice.DbService
+	var router *gin.Engine
+	var err error
+	DB, err = dbservice.NewDBService()
+
+	if err == nil {
+
+		client := dbservice.MongoClient()
+		store := mongodriver.NewStore(client, 3600, true, []byte("secret"))
+
+		ms := messengerserviceapi.MessengerService{
+			Sender:    make(chan *messengerserviceapi.SocketMessage, 100),
+			ErrorChan: make(chan messengerserviceapi.SocketError, 100),
+			DoneChan:  make(chan bool),
+			Wait:      &sync.WaitGroup{},
+			Logger:    log.Default(),
+			DbService: DB,
+			Sesion:    sessions.Sessions("key", store),
+		}
+
+		router, err = ms.SetupServer(false)
+
+		//listen messages and notifications
+		if err == nil {
+			go ms.MessageAndNotificationsnSender()
+
+			//listen for shutdown
+			go ms.ListenForShutdown()
+
+			router.Run(":8080")
+		}
+
+	} else {
+		fmt.Println(err.Error())
+	}
 }
