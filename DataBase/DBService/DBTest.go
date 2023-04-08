@@ -5,7 +5,6 @@ import (
 	"MessengerService/message"
 	"MessengerService/user"
 	"errors"
-	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -37,8 +36,6 @@ func (dbs *DbTest) GetUser(localUser user.User) (user *user.User, err error) {
 // Login Checks if one user is registed
 func (dbs DbTest) Login(localUser user.User) (user *user.User, err error) {
 	for _, v := range dbs.users {
-		fmt.Println(v)
-		fmt.Println(localUser)
 		if v.Credentials(&localUser) {
 			return v, err
 		}

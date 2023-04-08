@@ -45,6 +45,7 @@ type MessengerService struct {
 	Wait      *sync.WaitGroup
 	sockets   map[socket.SocketId]*socket.Socket
 	Logger    *log.Logger
+	ErrorLog  *log.Logger
 	socketIO  *socket.Server
 	DbService dbservice.DbInterface
 	Sesion    gin.HandlerFunc
@@ -415,6 +416,7 @@ func (ms *MessengerService) MessageAndNotificationsnSender() {
 				ms.sockets[msg.socket].Emit(msg.messageType, encyptedMessage)
 			}
 		case err := <-ms.ErrorChan:
+			ms.ErrorLog.Println("Error:", err.err.Error(), " from ", err.socket.Id())
 			err.socket.Emit(err.errorType, gin.H{"Error": err.err.Error()})
 		case <-ms.DoneChan:
 			return
@@ -425,7 +427,7 @@ func (ms *MessengerService) MessageAndNotificationsnSender() {
 // ListenForShutdown Listens for a signal to shutdown
 func (ms *MessengerService) ListenForShutdown() {
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	ms.ShutDown()
 	os.Exit(0)

@@ -3,8 +3,8 @@ package main
 import (
 	"MessengerService/dbservice"
 	messengerserviceapi "MessengerService/messengerserviceApi"
-	"fmt"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/gin-contrib/sessions"
@@ -17,6 +17,8 @@ func main() {
 	var router *gin.Engine
 	var err error
 	DB, err = dbservice.NewDBService()
+	logger := log.New(os.Stdout, "Info\t", log.Ldate|log.Ltime)
+	logerror := log.New(os.Stdout, "Error\t", log.Ldate|log.Ltime|log.Lshortfile)
 
 	if err == nil {
 
@@ -28,7 +30,8 @@ func main() {
 			ErrorChan: make(chan messengerserviceapi.SocketError, 100),
 			DoneChan:  make(chan bool),
 			Wait:      &sync.WaitGroup{},
-			Logger:    log.Default(),
+			Logger:    logger,
+			ErrorLog:  logerror,
 			DbService: DB,
 			Sesion:    sessions.Sessions("key", store),
 		}
@@ -46,6 +49,6 @@ func main() {
 		}
 
 	} else {
-		fmt.Println(err.Error())
+		logerror.Printf(err.Error())
 	}
 }
