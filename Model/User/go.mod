@@ -2,7 +2,7 @@ module MessengerService/user
 
 go 1.20
 
-require github.com/zishang520/socket.io v1.0.20
+require github.com/zishang520/socket.io v1.0.21
 
 require (
 	github.com/andybalholm/brotli v1.0.4 // indirect

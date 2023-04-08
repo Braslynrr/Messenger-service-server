@@ -3,7 +3,7 @@ module MessengerService/mesermanager
 go 1.20
 
 require (
-	github.com/zishang520/socket.io v1.0.20
+	github.com/zishang520/socket.io v1.0.21
 	go.mongodb.org/mongo-driver v1.11.0
 )
 
