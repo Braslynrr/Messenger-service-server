@@ -6,7 +6,6 @@ import (
 	"MessengerService/user"
 	"MessengerService/userserviceapi"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -52,7 +51,6 @@ func TestLogin(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/login", strings.NewReader(string(data)))
 	r.ServeHTTP(w, req)
 
-	fmt.Println(w.Body)
 	assert.Equal(t, 200, w.Code)
 }
 
