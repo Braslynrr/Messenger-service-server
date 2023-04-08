@@ -8,8 +8,8 @@ import (
 )
 
 type User struct {
-	Number   string          `bson:"number"`
-	Zone     string          `bson:"zone"`
+	Number   string          `bson:"number" uri:"number" json:"number"`
+	Zone     string          `bson:"zone" uri:"zone" json:"zone"`
 	State    string          `bson:"state,omitempty" json:"state,omitempty"`
 	UserName string          `bson:"username,omitempty" json:"username,omitempty"`
 	Password string          `bson:"password,omitempty" json:"password,omitempty"`
@@ -58,12 +58,12 @@ func NewUser(user User) (*User, error) {
 
 // IsEqual checks both user are equal by Zone and number
 func (user *User) IsEqual(other *User) bool {
-	return other != nil && user.Zone == other.Zone && user.Number == other.Number
+	return user.Zone == other.Zone && user.Number == other.Number
 }
 
 // Credentials check the credentials given and DB infomation are alike.
 func (user *User) Credentials(other *User) bool {
-	return other != nil && user.Zone == other.Zone && user.Number == other.Number && user.Password == other.Password
+	return user.Zone == other.Zone && user.Number == other.Number && user.Password == other.Password
 }
 
 // SetSocketID sets socket ID

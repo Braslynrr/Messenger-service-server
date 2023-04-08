@@ -77,14 +77,14 @@ func GetUsersFromGroup(members []*user.User, client *mongo.Client, ctx context.C
 }
 
 // GetAllGroups gets all groups and its members
-func GetAllGroups(localuser *user.User, client *mongo.Client, ctx context.Context) (groups []group.Group, err error) {
+func GetAllGroups(localuser *user.User, client *mongo.Client, ctx context.Context) (groups []*group.Group, err error) {
 	collection := client.Database("Messenger").Collection("Messages")
 	cursor, err := collection.Find(ctx, bson.M{"members": bson.M{"$all": bson.A{localuser}}})
 	for cursor.Next(ctx) {
 		memberGroup := &group.Group{}
 		cursor.Decode(memberGroup)
 		memberGroup.Members, err = GetUsersFromGroup(memberGroup.Members, client, ctx)
-		groups = append(groups, *memberGroup)
+		groups = append(groups, memberGroup)
 	}
 
 	return
@@ -94,7 +94,7 @@ func GetAllGroups(localuser *user.User, client *mongo.Client, ctx context.Contex
 // GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
 func GetGroupHistory(groupID primitive.ObjectID, time time.Time, client *mongo.Client, ctx context.Context) (history []*message.Message, err error) {
 	collection := client.Database("Messenger").Collection("Messages")
-	cursor, err := collection.Find(ctx, bson.M{"groupid": groupID, "sendeddate": bson.M{"$lte": time}}, &options.FindOptions{Sort: bson.M{"sendeddate": -1}})
+	cursor, err := collection.Find(ctx, bson.M{"groupid": groupID, "sentdate": bson.M{"$lte": time}}, &options.FindOptions{Sort: bson.M{"sentdate": -1}})
 	if err == nil {
 		for cursor.Next(ctx) && len(history) < 20 {
 			message := &message.Message{}

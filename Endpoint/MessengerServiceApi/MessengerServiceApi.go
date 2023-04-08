@@ -1,112 +1,140 @@
 package messengerserviceapi
 
 import (
+	"MessengerService/dbservice"
 	"MessengerService/group"
 	messengermanager "MessengerService/mesermanager"
 	msmessage "MessengerService/message"
 	"MessengerService/user"
+	"MessengerService/userserviceapi"
 	"MessengerService/utils"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/mapstructure"
+	cors "github.com/rs/cors/wrapper/gin"
 	"github.com/zishang520/socket.io/socket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-const standarKeySize = 16
+type SocketMessage struct {
+	message     *msmessage.Message
+	socket      socket.SocketId
+	messageType string
+}
+type SocketError struct {
+	err       error
+	errorType string
+	socket    *socket.Socket
+}
 
-func NewSocketIo() http.Handler {
-	serverIO := socket.NewServer(nil, nil)
+type MessengerService struct {
+	Sender    chan *SocketMessage
+	ErrorChan chan SocketError
+	DoneChan  chan bool
+	Wait      *sync.WaitGroup
+	sockets   map[socket.SocketId]*socket.Socket
+	Logger    *log.Logger
+	socketIO  *socket.Server
+	DbService dbservice.DbInterface
+	Sesion    gin.HandlerFunc
+}
 
-	serverIO.On("connection", func(clients ...any) {
+func (ms *MessengerService) newSocketIo() http.Handler {
+	ms.socketIO = socket.NewServer(nil, nil)
+
+	ms.socketIO.On("connection", func(clients ...any) {
 		client := clients[0].(*socket.Socket)
 
-		log.Printf("New Connection: %v", client.Id())
+		ms.Logger.Printf("New Connection: %v", client.Id())
 
 		client.On("messenger", func(data ...any) {
+			var err error
 
-			WSKey, err := utils.GenerateRandomAESKey(standarKeySize)
 			if err == nil {
+
+				WSKey, _ := utils.GenerateRandomAESKey(16)
+
+				client.Emit("WSKey", WSKey)
 				client.SetData(WSKey)
+
 				token, ok := data[0].(string)
 				if ok {
-					connectToMessengerService(client, token)
-				} else {
-					err = errors.New("object sended is not a token")
+					ms.connectToMessengerService(client, token)
+					ms.sockets[client.Id()] = client
 				}
+			} else {
+				err = errors.New("object sent is not a token")
 			}
-			HandleError(client, "", err)
-
+			ms.handleError(client, "", err)
 		})
 
 		client.On("sendMessage", func(message ...any) {
 
-			HandleError(client, "", HasUserMiddleware(client, sendMessage, message...))
+			ms.handleError(client, "", hasUserMiddleware(client, ms.sendMessage, message...))
 		})
 
 		client.On("GetCurrentGroups", func(...any) {
-			HandleError(client, "", HasUserMiddlewareNoParam(client, GetGroups))
+			ms.handleError(client, "", hasUserMiddlewareNoParam(client, ms.getGroups))
 		})
 
 		client.On("GroupHistory", func(history ...any) {
-			HandleError(client, "", HasUserMiddleware(client, getGroupHistory, history...))
+			ms.handleError(client, "", hasUserMiddleware(client, ms.getGroupHistory, history...))
 		})
 
 		client.On("SendSeen", func(SeenMesage ...any) {
-			HandleError(client, "", HasUserMiddleware(client, seenMessage, SeenMesage...))
+			ms.handleError(client, "", hasUserMiddleware(client, ms.seenMessage, SeenMesage...))
 		})
 
 		client.On("disconnect", func(reason ...any) {
 			log.Print(reason)
 		})
+
 	})
-	return serverIO.ServeHandler(nil)
+
+	return ms.socketIO.ServeHandler(nil)
 }
 
-// HandleError handles erros using a type and error
-func HandleError(conn *socket.Socket, errortype string, err error) {
+// handleError handles erros using a type and error
+func (ms *MessengerService) handleError(conn *socket.Socket, errortype string, err error) {
 	if err != nil {
-		conn.Emit(fmt.Sprintf("error%v", errortype), gin.H{"error": err.Error()})
+		ms.ErrorChan <- SocketError{err: err, socket: conn, errorType: fmt.Sprintf("error%v", errortype)}
 	}
 }
 
 // ConnectToMessengerService connects a user to Online channel using a token
-func connectToMessengerService(conn *socket.Socket, token string) {
+func (ms *MessengerService) connectToMessengerService(conn *socket.Socket, token string) {
 	var err error
-	var encryptedUser string
-	MS, err := messengermanager.NewMessengerManager()
+	var user *user.User
+
+	MS, err := messengermanager.NewMessengerManager(nil)
 	if err == nil {
 		token := fmt.Sprintf("%v", token)
-		user, err := MS.HasTokenAccess(token)
+		user, err = MS.HasTokenAccess(token)
 		if err == nil {
 			AESkey := fmt.Sprintf("%v", conn.Data())
 			user.SetSocketID(conn.Id())
 			conn.SetData(gin.H{"key": AESkey, "user": *user})
 			conn.Join("Online")
-			conn.Emit("WSKey", AESkey)
-			encryptedUser, err = utils.EncryptInterface(user, AESkey)
-			if err != nil {
-				HandleError(conn, "", err)
-				return
-
-			}
-			conn.Emit("Log In", encryptedUser)
-
+			conn.Emit("Log In", user)
 			return
 		}
 	}
-	HandleError(conn, "", err)
+	ms.handleError(conn, "", err)
 }
 
 // sendMessage sends a message to group or chat
-func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
+func (ms *MessengerService) sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 	var decryptedContent string
 	var message map[string]any = make(map[string]any)
 
@@ -119,7 +147,7 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 
 	if err == nil {
 
-		MS, err1 := messengermanager.NewMessengerManager()
+		MS, err1 := messengermanager.NewMessengerManager(nil)
 		err = err1
 		if err == nil {
 			toList := make([]*user.User, 0)
@@ -130,7 +158,6 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 				if len(toList) > 0 {
 
 					if err == nil {
-
 						var encryptedInterface string
 						var groupID primitive.ObjectID
 						var sockets map[socket.SocketId]bool
@@ -144,10 +171,9 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 							groupID, err = MS.CreateGroup(user, toList)
 							if err == nil {
 								group, _ := MS.GetGroup(groupID)
-								encryptedInterface, err = utils.EncryptInterface(group, context["key"].(string))
-								if err == nil {
-									conn.Emit("NewGroup", encryptedInterface)
-								}
+
+								conn.Emit("NewGroup", group)
+
 							}
 						}
 
@@ -155,10 +181,20 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 						sockets, err = MS.SaveMessage(&user, toList, newMessage)
 
 						if err == nil {
-							MS.SendToNumber(conn, "NewMessage", sockets, newMessage)
+
+							go func() {
+
+								for key := range sockets {
+									if conn.Id() != key {
+										ms.Sender <- &SocketMessage{message: newMessage, socket: key, messageType: "NewMessage"}
+									}
+								}
+
+							}()
+
 							encyptedMessage, err := utils.EncryptInterface(map[string]any{"ok": true, "message": newMessage}, context["key"].(string))
 							if err == nil {
-								conn.Emit("SendedMessage", encyptedMessage)
+								conn.Emit("SentMessage", encyptedMessage)
 							} else {
 								conn.Emit("error", gin.H{"error": err.Error()})
 							}
@@ -166,7 +202,7 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 						} else {
 							encryptedInterface, err = utils.EncryptInterface(newMessage, context["key"].(string))
 							if err == nil {
-								conn.Emit("SendedMessage", gin.H{"ok": false, "message": encryptedInterface})
+								conn.Emit("SentMessage", gin.H{"ok": false, "message": encryptedInterface})
 							}
 						}
 
@@ -177,41 +213,35 @@ func sendMessage(conn *socket.Socket, Decryptedmessage string) (err error) {
 			}
 		}
 	}
-	HandleError(conn, "", err)
+	ms.handleError(conn, "", err)
 	return
 }
 
 // getGroupHistory returns a list of 10 last messages using a date
-func getGroupHistory(conn *socket.Socket, decryptedmessage string) (err error) {
+func (ms *MessengerService) getGroupHistory(conn *socket.Socket, groupInfo map[string]any) (err error) {
 	context := conn.Data().(gin.H)
 	var ID primitive.ObjectID
 	var history []*msmessage.Message
 	var mTime time.Time
-	var info map[string]any
+	var encryptedmessage string
 
-	decryptedmessage, err = utils.DecryptText(decryptedmessage, context["key"].(string))
+	MS, err1 := messengermanager.NewMessengerManager(nil)
+	err = err1
 	if err == nil {
-		err = json.Unmarshal([]byte(decryptedmessage), &info)
+		ID, err = primitive.ObjectIDFromHex(groupInfo["ID"].(string))
 		if err == nil {
-			MS, err1 := messengermanager.NewMessengerManager()
-			err = err1
+			mTime, err = time.Parse(time.RFC3339, groupInfo["time"].(string))
 			if err == nil {
-				ID, err = primitive.ObjectIDFromHex(info["ID"].(string))
+				history, err = MS.GetGroupHistory(ID, mTime)
 				if err == nil {
-					mTime, err = time.Parse(time.RFC3339, info["time"].(string))
+					for _, msg := range history {
+						user := context["user"].(user.User)
+						msg.WillSendtoUser(&user)
+					}
+					// re-using variable to encrypt
+					encryptedmessage, err = utils.EncryptInterface(history, context["key"].(string))
 					if err == nil {
-						history, err = MS.GetGroupHistory(ID, mTime)
-						if err == nil {
-							for _, msg := range history {
-								user := context["user"].(user.User)
-								msg.WillSendtoUser(&user)
-							}
-							// re-using variable to encrypt
-							decryptedmessage, err = utils.EncryptInterface(history, context["key"].(string))
-							if err == nil {
-								conn.Emit("History", decryptedmessage)
-							}
-						}
+						conn.Emit("History", encryptedmessage)
 					}
 				}
 			}
@@ -222,27 +252,27 @@ func getGroupHistory(conn *socket.Socket, decryptedmessage string) (err error) {
 }
 
 // seenMessage mark as Read a message by this connection user
-func seenMessage(conn *socket.Socket, decryptedmessage string) (err error) {
+func (ms *MessengerService) seenMessage(conn *socket.Socket, id string) (err error) {
 	context := conn.Data().(gin.H)
-	var ID primitive.ObjectID
 	var message msmessage.Message
 	var localUser user.User = context["user"].(user.User)
+	var ID primitive.ObjectID
 
-	decryptedmessage, err = utils.DecryptText(decryptedmessage, context["key"].(string))
+	ID, err = primitive.ObjectIDFromHex(id)
+
 	if err == nil {
-		MS, err1 := messengermanager.NewMessengerManager()
-		err = err1
-		if err == nil {
-			ID, err = primitive.ObjectIDFromHex(decryptedmessage)
-			if err == nil {
-				message, err = MS.MessageWasSeenBy(ID, localUser)
-				if err == nil {
-					if !message.From.IsEqual(&localUser) {
-						message.WillSendtoUser(message.From)
-						socket := MS.MapNumberToSocketID(message.From)
-						MS.SendToNumber(conn, "ReadedMessage", socket, &message)
-					}
 
+		MS, err := messengermanager.NewMessengerManager(nil)
+
+		if err == nil {
+			message, err = MS.MessageWasSeenBy(ID, localUser)
+			if err == nil {
+				if !message.From.IsEqual(&localUser) {
+					message.WillSendtoUser(message.From)
+					socket := MS.MapNumberToSocketID(message.From)
+					if socket != nil {
+						ms.Sender <- &SocketMessage{socket: *socket, message: &message, messageType: "ReadMessage"}
+					}
 				}
 
 			}
@@ -252,12 +282,12 @@ func seenMessage(conn *socket.Socket, decryptedmessage string) (err error) {
 }
 
 // GetPage Return the Test page
-func GetPage(c *gin.Context) {
-	c.HTML(200, "websockets.html", nil)
+func (ms *MessengerService) getPage(c *gin.Context) {
+	c.File("../../ServerFiles/html/websockets.html")
 }
 
 // returns a key generated on GetPage
-func GetKey(c *gin.Context) {
+func (ms *MessengerService) getKey(c *gin.Context) {
 
 	var err error
 	session := sessions.Default(c)
@@ -273,38 +303,32 @@ func GetKey(c *gin.Context) {
 }
 
 // GetGroups returns all user's group
-func GetGroups(conn *socket.Socket) (err error) {
+func (ms *MessengerService) getGroups(conn *socket.Socket) (err error) {
 	context := conn.Data()
 	contextMap, ok := context.(gin.H)
 	if ok {
 		user, _ := user.NewUser(contextMap["user"].(user.User))
-		MS, err1 := messengermanager.NewMessengerManager()
+		MS, err1 := messengermanager.NewMessengerManager(nil)
 		err = err1
 		if err == nil {
-			var groups []group.Group
+			var groups []*group.Group
 			groups, err = MS.GetAllGroups(*user)
-			if err == nil {
-				var encryptedGroups string
-				context := conn.Data().(gin.H)
-				encryptedGroups, err = utils.EncryptInterface(groups, context["key"].(string))
-				if err == nil {
-					conn.Emit("AllCurrentGroups", encryptedGroups)
-				}
-			}
 
+			conn.Emit("AllCurrentGroups", groups)
 		}
+
 	}
-	HandleError(conn, "", err)
+	ms.handleError(conn, "", err)
 	return
 }
 
-// HasUserMiddleware checks if user is loged in
-func HasUserMiddleware(conn *socket.Socket, next func(*socket.Socket, string) error, args ...any) (err error) {
+// hasUserMiddleware checks if user is loged in
+func hasUserMiddleware[T any](conn *socket.Socket, next func(*socket.Socket, T) error, args ...any) (err error) {
 
 	context := conn.Data()
 	contextMap, ok := context.(gin.H)
 	if ok {
-		arg, ok := args[0].(string)
+		arg, ok := args[0].(T)
 		if ok && contextMap["user"] != nil {
 
 			return next(conn, arg)
@@ -312,11 +336,11 @@ func HasUserMiddleware(conn *socket.Socket, next func(*socket.Socket, string) er
 
 	}
 
-	return errors.New("connection has done an invalid action due to should log in")
+	return errors.New("connection should be connected using a token")
 }
 
 // HasUserMiddleware checks if user is loged in
-func HasUserMiddlewareNoParam(conn *socket.Socket, next func(*socket.Socket) error) (err error) {
+func hasUserMiddlewareNoParam(conn *socket.Socket, next func(*socket.Socket) error) (err error) {
 
 	context := conn.Data()
 	contextMap, ok := context.(gin.H)
@@ -325,5 +349,104 @@ func HasUserMiddlewareNoParam(conn *socket.Socket, next func(*socket.Socket) err
 		return next(conn)
 	}
 
-	return errors.New("connection has done an invalid action due to should log in")
+	return errors.New("connection should be connected using a token")
+}
+
+// SetContextID set token for session
+func setContextID(ctx *gin.Context) { // pending to fix
+
+	sessionID, err := ctx.Cookie("session_id")
+
+	if err != nil || sessionID == "" {
+		sessionID, _ = utils.GenerateToken()
+		ctx.SetCookie("session_id", sessionID, 0, "", "", false, true)
+
+		session := sessions.Default(ctx)
+		session.Set("session_id", sessionID)
+		session.Save()
+
+		defer session.Save()
+	}
+
+	ctx.Next()
+}
+
+// SetupServer sets up the Gin server
+func (ms *MessengerService) SetupServer(IsEncrypted bool) (router *gin.Engine, err error) {
+
+	mm, err := messengermanager.NewMessengerManager(ms.DbService)
+	if mm.IsInitialize() {
+		ms.sockets = make(map[socket.SocketId]*socket.Socket)
+
+		router = gin.Default()
+		router.Use(cors.Default())
+		router.Use(ms.Sesion)
+		router.Use(setContextID)
+
+		router.GET("/Key", ms.getKey)
+		router.POST("/User", utils.DecryptMiddleWare(IsEncrypted), userserviceapi.NewUser, utils.EncryptMiddleWare(IsEncrypted))
+		router.POST("/User/Login", utils.DecryptMiddleWare(IsEncrypted), userserviceapi.Login, utils.EncryptMiddleWare(IsEncrypted))
+		router.GET("/User/:zone/:number", userserviceapi.GetUser, utils.EncryptMiddleWare(IsEncrypted))
+		router.GET("/Groups/:zone/:number", userserviceapi.GetGroups, utils.EncryptMiddleWare(IsEncrypted))
+
+		handler := ms.newSocketIo()
+
+		router.GET("/socket.io/*any", gin.WrapH(handler))
+		router.POST("/socket.io/*any", gin.WrapH(handler))
+
+		router.StaticFS("/static", http.Dir("../../ServerFiles"))
+
+		router.GET("/", ms.getPage)
+	} else {
+		err = errors.New("messenger manager is not initialized")
+	}
+	return
+}
+
+// MessageAndNotificationsnSender send some messages and notifications in background
+func (ms *MessengerService) MessageAndNotificationsnSender() {
+	for {
+		select {
+		case msg := <-ms.Sender:
+			usercontext := ms.sockets[msg.socket].Data().(gin.H)
+			encyptedMessage, err := utils.EncryptInterface(msg.message, usercontext["key"].(string))
+			if err == nil {
+				ms.Logger.Println("Sending ", msg.messageType, " to ", msg.socket)
+				ms.sockets[msg.socket].Emit(msg.messageType, encyptedMessage)
+			}
+		case err := <-ms.ErrorChan:
+			err.socket.Emit(err.errorType, gin.H{"Error": err.err.Error()})
+		case <-ms.DoneChan:
+			return
+		}
+	}
+}
+
+// ListenForShutdown Listens for a signal to shutdown
+func (ms *MessengerService) ListenForShutdown() {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	ms.ShutDown()
+	os.Exit(0)
+}
+
+// ShutDown shutdowns the server
+func (ms *MessengerService) ShutDown() {
+	ms.Logger.Println("Would run cleanup tasks...")
+
+	ms.Logger.Println("Closign SocketIo Server...")
+
+	ms.socketIO.To("Online").DisconnectSockets(true)
+	ms.socketIO.Clear()
+	ms.socketIO = nil
+
+	ms.Wait.Wait()
+
+	ms.Logger.Println("Closign Channels and shutting down the server...")
+	close(ms.Sender)
+	close(ms.ErrorChan)
+	close(ms.DoneChan)
+	ms.sockets = nil
+
 }

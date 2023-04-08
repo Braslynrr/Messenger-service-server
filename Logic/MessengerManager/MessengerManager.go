@@ -1,6 +1,7 @@
 package messengermanager
 
 import (
+	"MessengerService/dbservice"
 	"MessengerService/group"
 	"MessengerService/groupmanager"
 	"MessengerService/message"
@@ -14,7 +15,9 @@ import (
 )
 
 type messengerManager struct {
-	userManager *usermanager.UserManager
+	userManager  *usermanager.UserManager
+	groupManager *groupmanager.GroupManager
+	Keys         map[string]string
 }
 
 // singleton instance
@@ -25,22 +28,33 @@ var (
 var lock = &sync.Mutex{}
 
 // NewMessengerManager Creates a unique new instance
-func NewMessengerManager() (*messengerManager, error) {
+func NewMessengerManager(DB dbservice.DbInterface) (*messengerManager, error) {
 	lock.Lock()
 	defer lock.Unlock()
 
 	if instance == nil {
-
-		instance = &messengerManager{userManager: usermanager.NewUserManger()}
-
+		instance = &messengerManager{userManager: usermanager.NewUserManger(DB), groupManager: groupmanager.NewGroupManager(DB), Keys: map[string]string{}}
 	}
 
 	return instance, nil
 }
 
+func (ms *messengerManager) IsInitialize() bool {
+	return ms.userManager != nil && ms.groupManager != nil && ms.Keys != nil
+}
+
 // InsertUser calls usermanager.InsertUser to insert a user to the DB
 func (ms *messengerManager) InsertUser(user user.User) (ok bool, err error) {
 	ok, err = ms.userManager.InsertUser(user)
+	return
+}
+
+// Login check user credentials to return a new token
+func (ms *messengerManager) FakeLogin(user user.User, token string) (err error) {
+	ok, err := ms.userManager.Login(user)
+	if ok != nil && err == nil {
+		ms.userManager.FakeGenerateToken(&user, token)
+	}
 	return
 }
 
@@ -61,61 +75,74 @@ func (ms *messengerManager) HasTokenAccess(token string) (user *user.User, err e
 
 // CheckGroupc checks if a group already exist
 func (ms *messengerManager) CheckGroup(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
-	groupID, err = groupmanager.CheckGroup(user, to)
+	groupID, err = ms.groupManager.CheckGroup(user, to)
 	return
 }
 
 // CreateGroup create a new group in the DB
 func (ms *messengerManager) CreateGroup(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
-	groupID, err = groupmanager.CreateGroup(user, to)
+	groupID, err = ms.groupManager.CreateGroup(user, to)
 	return
 }
 
 // GetGroup gets a group by its identificator
 func (ms *messengerManager) GetGroup(groupID primitive.ObjectID) (group *group.Group, err error) {
-	group, err = groupmanager.GetGroup(groupID)
+	group, err = ms.groupManager.GetGroup(groupID)
 	return
 }
 
 // SendMessage initialize the process of sending a message
 func (ms *messengerManager) SaveMessage(user *user.User, to []*user.User, message *message.Message) (numbers map[socket.SocketId]bool, err error) {
-	err = groupmanager.SaveMessage(message)
-	if err == nil {
+	wait := sync.WaitGroup{}
+	wait.Add(2)
+	go func() {
+		defer wait.Done()
+		err = ms.groupManager.SaveMessage(message)
+	}()
+
+	go func() {
+		defer wait.Done()
 		var tempNumbers []string
 		for _, user := range append(to, user) {
 			tempNumbers = append(tempNumbers, user.Zone+user.Number)
 		}
 		numbers = ms.userManager.MapNumbersToSocketID(tempNumbers)
-	}
+	}()
+
+	wait.Wait()
 
 	return
 }
 
-// SendToNumber send a message to a group of numbers
-func (ms *messengerManager) SendToNumber(conn *socket.Socket, channel string, numbers map[socket.SocketId]bool, message *message.Message) {
-	ms.userManager.SendToNumber(conn, channel, numbers, message)
-}
-
 // GetAllGroups gets all groups and its member using an user
-func (ms *messengerManager) GetAllGroups(user user.User) (groups []group.Group, err error) {
-	groups, err = groupmanager.GetAllGroups(&user)
+func (ms *messengerManager) GetAllGroups(user user.User) (groups []*group.Group, err error) {
+	groups, err = ms.groupManager.GetAllGroups(&user)
 	return
 }
 
 // GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
 func (ms *messengerManager) GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
-	history, err = groupmanager.GetGroupHistory(groupID, time)
+	history, err = ms.groupManager.GetGroupHistory(groupID, time)
 	return
 }
 
 // MessageWasSeenBy sets a message as senn by user
 func (ms *messengerManager) MessageWasSeenBy(messageID primitive.ObjectID, user user.User) (message message.Message, err error) {
-	message, err = groupmanager.UpdateMessageReadBy(messageID, user)
+	message, err = ms.groupManager.UpdateMessageReadBy(messageID, user)
 	return
 }
 
 // MapNumberToSocketID Map a User to SocketID if it's online
-func (ms *messengerManager) MapNumberToSocketID(user *user.User) (numbers map[socket.SocketId]bool) {
-	numbers = ms.userManager.MapNumbersToSocketID([]string{user.Zone + user.Number})
+func (ms *messengerManager) MapNumberToSocketID(user *user.User) *socket.SocketId {
+	numbers := ms.userManager.MapNumbersToSocketID([]string{user.Zone + user.Number})
+	for si := range numbers {
+		return &si
+	}
+	return nil
+}
+
+// GetUser gets an user from userManager
+func (ms *messengerManager) GetUser(user user.User) (returneduser *user.User, err error) {
+	returneduser, err = ms.userManager.GetUser(user)
 	return
 }

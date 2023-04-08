@@ -1,32 +1,51 @@
 package main
 
 import (
+	"MessengerService/dbservice"
 	messengerserviceapi "MessengerService/messengerserviceApi"
-	"MessengerService/userserviceapi"
+	"fmt"
+	"log"
+	"sync"
 
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-contrib/sessions/mongo/mongodriver"
 	"github.com/gin-gonic/gin"
-	cors "github.com/rs/cors/wrapper/gin"
 )
 
 func main() {
-	router := gin.Default()
-	router.Use(cors.Default())
-	store := cookie.NewStore([]byte(""))
-	router.Use(sessions.Sessions("key", store))
+	var DB *dbservice.DbService
+	var router *gin.Engine
+	var err error
+	DB, err = dbservice.NewDBService()
 
-	router.GET("/Key", messengerserviceapi.GetKey)
-	router.POST("/User", userserviceapi.NewUser)
-	router.POST("/User/Login", userserviceapi.Login)
+	if err == nil {
 
-	handler := messengerserviceapi.NewSocketIo()
+		client := dbservice.MongoClient()
+		store := mongodriver.NewStore(client, 3600, true, []byte("secret"))
 
-	router.GET("/socket.io/*any", gin.WrapH(handler))
-	router.POST("/socket.io/*any", gin.WrapH(handler))
-	router.LoadHTMLFiles("../../ServerFiles/html/websockets.html")
+		ms := messengerserviceapi.MessengerService{
+			Sender:    make(chan *messengerserviceapi.SocketMessage, 100),
+			ErrorChan: make(chan messengerserviceapi.SocketError, 100),
+			DoneChan:  make(chan bool),
+			Wait:      &sync.WaitGroup{},
+			Logger:    log.Default(),
+			DbService: DB,
+			Sesion:    sessions.Sessions("key", store),
+		}
 
-	router.GET("/", messengerserviceapi.GetPage)
+		router, err = ms.SetupServer(false)
 
-	router.Run(":8080")
+		//listen messages and notifications
+		if err == nil {
+			go ms.MessageAndNotificationsnSender()
+
+			//listen for shutdown
+			go ms.ListenForShutdown()
+
+			router.Run(":8080")
+		}
+
+	} else {
+		fmt.Println(err.Error())
+	}
 }
