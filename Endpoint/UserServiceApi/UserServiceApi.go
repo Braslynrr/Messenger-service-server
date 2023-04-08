@@ -19,7 +19,7 @@ func NewUser(c *gin.Context) {
 		return
 	}
 
-	messman, err2 := messengermanager.NewMessengerManager()
+	messman, err2 := messengermanager.NewMessengerManager(nil)
 	err = err2
 	if err2 == nil {
 		var ok bool
@@ -46,7 +46,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	messman, mmerr := messengermanager.NewMessengerManager()
+	messman, mmerr := messengermanager.NewMessengerManager(nil)
 
 	if mmerr == nil {
 
@@ -75,7 +75,7 @@ func GetUser(c *gin.Context) {
 
 	if err = c.ShouldBindUri(&tempUser); err == nil {
 
-		messman, mmerr := messengermanager.NewMessengerManager()
+		messman, mmerr := messengermanager.NewMessengerManager(nil)
 
 		if mmerr == nil {
 			tempUser, err = messman.GetUser(*tempUser)
@@ -93,12 +93,12 @@ func GetUser(c *gin.Context) {
 // GetGroups Gets groups by user
 func GetGroups(c *gin.Context) {
 	var tempUser *user.User
-	var grouplist []group.Group
+	var grouplist []*group.Group
 	var err error
 
 	if err = c.ShouldBindUri(&tempUser); err == nil {
 
-		messman, mmerr := messengermanager.NewMessengerManager()
+		messman, mmerr := messengermanager.NewMessengerManager(nil)
 
 		if mmerr == nil {
 			grouplist, err = messman.GetAllGroups(*tempUser)
