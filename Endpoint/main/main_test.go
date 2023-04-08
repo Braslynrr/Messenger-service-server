@@ -1,6 +1,7 @@
 package main
 
 import (
+	"MessengerService/dbservice"
 	messengerserviceapi "MessengerService/messengerserviceApi"
 	"log"
 	"net/http"
@@ -14,11 +15,14 @@ import (
 
 func TestMain(t *testing.T) {
 	ms := messengerserviceapi.MessengerService{
-		Sender: make(chan *messengerserviceapi.SocketMessage, 100),
-		Wait:   &sync.WaitGroup{},
-		Logger: log.Default(),
+		Sender:    make(chan *messengerserviceapi.SocketMessage, 1),
+		ErrorChan: make(chan messengerserviceapi.SocketError, 1),
+		DoneChan:  make(chan bool),
+		Wait:      &sync.WaitGroup{},
+		Logger:    log.Default(),
+		DbService: &dbservice.DbTest{},
 	}
-	router := ms.SetupServer(false)
+	router, _ := ms.SetupServer(false)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/", nil)

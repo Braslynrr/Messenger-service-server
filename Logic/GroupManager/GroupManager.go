@@ -10,65 +10,52 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type GroupManager struct {
+	dbservice dbservice.DbInterface
+}
+
+func NewGroupManager(DB dbservice.DbInterface) *GroupManager {
+	return &GroupManager{dbservice: DB}
+}
+
 // SendMessage sends a message to the DB
-func SaveMessage(message *message.Message) (err error) {
-	dbs, err := dbservice.NewDBService()
-	if err == nil {
-		err = dbs.SaveMessage(message)
-	}
+func (gm *GroupManager) SaveMessage(message *message.Message) (err error) {
+	err = gm.dbservice.SaveMessage(message)
 	return
 }
 
 // HasGroup checks if gruup exists
-func CheckGroup(user user.User, to []*user.User) (ID primitive.ObjectID, err error) {
-	dbs, err := dbservice.NewDBService()
-	if err == nil {
-		ID, err = dbs.CheckGroup(&user, to)
-	}
+func (gm *GroupManager) CheckGroup(user user.User, to []*user.User) (ID primitive.ObjectID, err error) {
+	ID, err = gm.dbservice.CheckGroup(&user, to)
 	return
 }
 
 // CreateGroup  create a new group
-func CreateGroup(user user.User, to []*user.User) (ID primitive.ObjectID, err error) {
-	dbs, err := dbservice.NewDBService()
-	if err == nil {
-		ID, err = dbs.CreateGroup(&user, to)
-	}
+func (gm *GroupManager) CreateGroup(user user.User, to []*user.User) (ID primitive.ObjectID, err error) {
+	ID, err = gm.dbservice.CreateGroup(&user, to)
 	return
 }
 
 // GetGroup gets a existing group
-func GetGroup(ID primitive.ObjectID) (group *group.Group, err error) {
-	dbs, err := dbservice.NewDBService()
-	if err == nil {
-		group, err = dbs.GetGroup(ID)
-	}
+func (gm *GroupManager) GetGroup(ID primitive.ObjectID) (group *group.Group, err error) {
+	group, err = gm.dbservice.GetGroup(ID)
 	return
 }
 
 // GetAllGroups returns all groups of an user
-func GetAllGroups(user *user.User) (groups []group.Group, err error) {
-	dbs, err := dbservice.NewDBService()
-	if err == nil {
-		groups, err = dbs.GetAllGroups(user)
-	}
+func (gm *GroupManager) GetAllGroups(user *user.User) (groups []*group.Group, err error) {
+	groups, err = gm.dbservice.GetAllGroups(user)
 	return
 }
 
 // GetGroupHistory gets the last messages with a maximun of 20 messages usincg a date as reference
-func GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
-	dbs, err := dbservice.NewDBService()
-	if err == nil {
-		history, err = dbs.GetGroupHistory(groupID, time)
-	}
+func (gm *GroupManager) GetGroupHistory(groupID primitive.ObjectID, time time.Time) (history []*message.Message, err error) {
+	history, err = gm.dbservice.GetGroupHistory(groupID, time)
 	return
 }
 
 // UpdateMessageReadBy updates ReadBy field with number and server time
-func UpdateMessageReadBy(messageID primitive.ObjectID, user user.User) (message message.Message, err error) {
-	dbs, err := dbservice.NewDBService()
-	if err == nil {
-		message, err = dbs.UpdateMessageReadBy(messageID, user)
-	}
+func (gm *GroupManager) UpdateMessageReadBy(messageID primitive.ObjectID, user user.User) (message message.Message, err error) {
+	message, err = gm.dbservice.UpdateMessageReadBy(messageID, user)
 	return
 }

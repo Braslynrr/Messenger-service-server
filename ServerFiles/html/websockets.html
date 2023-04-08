@@ -41,7 +41,9 @@
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
-            }})
+            }
+        })
+
         let data = await response.json()
         output.innerHTML +="my Key for Normal request is " + data.initialValue+"\n"
         generalKey= CryptoJS.enc.Hex.parse(data.initialValue)
@@ -103,7 +105,7 @@
             if(message.ok){
                 output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was correctly sended\n`
             }else{
-                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message wasnt sended\n`
+                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was not sended\n`
             }
         
         })
@@ -171,7 +173,7 @@
 
     function SeenMessage (){
 
-       let message = messages.filter(x=>x.IsRead==false)[0]
+        let message = messages.filter(x=>x.IsRead==false)[0]
         socket.emit("SendSeen", message.ID)
     }
 
