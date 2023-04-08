@@ -13,7 +13,7 @@ github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
 github.com/zishang520/engine.io v1.3.1 h1:nzEcl+giVSN9a/vfo07zaUedy12Ehzwk/neNKZqgOyA=
-github.com/zishang520/socket.io v1.0.20 h1:l/MWDMxicAPOvRdfyvFEY6rTCKsHb7Tq6CUGQKqM8Qg=
+github.com/zishang520/socket.io v1.0.21 h1:P/kHw/CvaH17UxZnVhzU+jv3cYPW8uzQSOGaaNAXNdI=
 golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561 h1:MDc5xs78ZrZr3HMQugiXOAkSZtfTpbJLDr/lwfgO53E=
 golang.org/x/sys v0.2.0 h1:ljd4t30dBnAvMZaQCevtY0xLLD0A+bRZXbgLMLU1F/A=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
