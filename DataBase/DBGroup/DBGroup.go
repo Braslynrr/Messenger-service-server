@@ -94,7 +94,7 @@ func GetAllGroups(localuser *user.User, client *mongo.Client, ctx context.Contex
 // GetGroupHistory gets the last messages with a maximun of 20 messages using a date as reference
 func GetGroupHistory(groupID primitive.ObjectID, time time.Time, client *mongo.Client, ctx context.Context) (history []*message.Message, err error) {
 	collection := client.Database("Messenger").Collection("Messages")
-	cursor, err := collection.Find(ctx, bson.M{"groupid": groupID, "sendeddate": bson.M{"$lte": time}}, &options.FindOptions{Sort: bson.M{"sendeddate": -1}})
+	cursor, err := collection.Find(ctx, bson.M{"groupid": groupID, "sentdate": bson.M{"$lte": time}}, &options.FindOptions{Sort: bson.M{"sentdate": -1}})
 	if err == nil {
 		for cursor.Next(ctx) && len(history) < 20 {
 			message := &message.Message{}

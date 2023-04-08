@@ -7,6 +7,8 @@ import (
 	"log"
 	"sync"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/mongo/mongodriver"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,6 +20,9 @@ func main() {
 
 	if err == nil {
 
+		client := dbservice.MongoClient()
+		store := mongodriver.NewStore(client, 3600, true, []byte("secret"))
+
 		ms := messengerserviceapi.MessengerService{
 			Sender:    make(chan *messengerserviceapi.SocketMessage, 100),
 			ErrorChan: make(chan messengerserviceapi.SocketError, 100),
@@ -25,6 +30,7 @@ func main() {
 			Wait:      &sync.WaitGroup{},
 			Logger:    log.Default(),
 			DbService: DB,
+			Sesion:    sessions.Sessions("key", store),
 		}
 
 		router, err = ms.SetupServer(false)

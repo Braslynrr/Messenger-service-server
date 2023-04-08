@@ -95,17 +95,17 @@
             output.innerHTML+=` I was joined to a new group: ${JSON.stringify(group,null, 2)}\n`
         })
 
-        socket.on("ReadedMessage",function(encryptedMessage){
+        socket.on("ReadMessage",function(encryptedMessage){
             let updatedMessage = decryptText(encryptedMessage,WSKey)
             output.innerHTML+=` SomeOne read this message: ${JSON.stringify(updatedMessage,null, 2)}\n`
         })
 
-        socket.on("SendedMessage",function(encryptedMessage){
+        socket.on("SentMessage",function(encryptedMessage){
             let message = decryptText(encryptedMessage,WSKey)
             if(message.ok){
-                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was correctly sended\n`
+                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was correctly sent\n`
             }else{
-                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was not sended\n`
+                output.innerHTML+=`This ${JSON.stringify(message.message,null, 2)} message was not sent\n`
             }
         
         })

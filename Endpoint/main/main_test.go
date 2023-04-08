@@ -10,10 +10,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/go-playground/assert"
 )
 
 func TestMain(t *testing.T) {
+	store := cookie.NewStore([]byte(""))
+
 	ms := messengerserviceapi.MessengerService{
 		Sender:    make(chan *messengerserviceapi.SocketMessage, 1),
 		ErrorChan: make(chan messengerserviceapi.SocketError, 1),
@@ -21,6 +25,7 @@ func TestMain(t *testing.T) {
 		Wait:      &sync.WaitGroup{},
 		Logger:    log.Default(),
 		DbService: &dbservice.DbTest{},
+		Sesion:    sessions.Sessions("key", store),
 	}
 	router, _ := ms.SetupServer(false)
 

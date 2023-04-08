@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/mongo/mongodriver"
 	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/mapstructure"
 	cors "github.com/rs/cors/wrapper/gin"
@@ -48,6 +47,7 @@ type MessengerService struct {
 	Logger    *log.Logger
 	socketIO  *socket.Server
 	DbService dbservice.DbInterface
+	Sesion    gin.HandlerFunc
 }
 
 func (ms *MessengerService) newSocketIo() http.Handler {
@@ -74,7 +74,7 @@ func (ms *MessengerService) newSocketIo() http.Handler {
 					ms.sockets[client.Id()] = client
 				}
 			} else {
-				err = errors.New("object sended is not a token")
+				err = errors.New("object sent is not a token")
 			}
 			ms.handleError(client, "", err)
 		})
@@ -194,7 +194,7 @@ func (ms *MessengerService) sendMessage(conn *socket.Socket, Decryptedmessage st
 
 							encyptedMessage, err := utils.EncryptInterface(map[string]any{"ok": true, "message": newMessage}, context["key"].(string))
 							if err == nil {
-								conn.Emit("SendedMessage", encyptedMessage)
+								conn.Emit("SentMessage", encyptedMessage)
 							} else {
 								conn.Emit("error", gin.H{"error": err.Error()})
 							}
@@ -202,7 +202,7 @@ func (ms *MessengerService) sendMessage(conn *socket.Socket, Decryptedmessage st
 						} else {
 							encryptedInterface, err = utils.EncryptInterface(newMessage, context["key"].(string))
 							if err == nil {
-								conn.Emit("SendedMessage", gin.H{"ok": false, "message": encryptedInterface})
+								conn.Emit("SentMessage", gin.H{"ok": false, "message": encryptedInterface})
 							}
 						}
 
@@ -271,7 +271,7 @@ func (ms *MessengerService) seenMessage(conn *socket.Socket, id string) (err err
 					message.WillSendtoUser(message.From)
 					socket := MS.MapNumberToSocketID(message.From)
 					if socket != nil {
-						ms.Sender <- &SocketMessage{socket: *socket, message: &message, messageType: "ReadedMessage"}
+						ms.Sender <- &SocketMessage{socket: *socket, message: &message, messageType: "ReadMessage"}
 					}
 				}
 
@@ -380,10 +380,7 @@ func (ms *MessengerService) SetupServer(IsEncrypted bool) (router *gin.Engine, e
 
 		router = gin.Default()
 		router.Use(cors.Default())
-
-		client := dbservice.MongoClient()
-		store := mongodriver.NewStore(client, 3600, true, []byte("secret"))
-		router.Use(sessions.Sessions("key", store))
+		router.Use(ms.Sesion)
 		router.Use(setContextID)
 
 		router.GET("/Key", ms.getKey)
