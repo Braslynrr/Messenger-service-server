@@ -60,9 +60,13 @@ func (ms *messengerManager) FakeLogin(user user.User, token string) (err error) 
 
 // Login check user credentials to return a new token
 func (ms *messengerManager) Login(user user.User) (token string, err error) {
+
 	ok, err := ms.userManager.Login(user)
 	if ok != nil && err == nil {
-		token, err = ms.userManager.GenerateToken(ok)
+		if token = ms.userManager.HasTokenAccess(*ok); token == "" {
+			token, err = ms.userManager.GenerateToken(ok)
+		}
+
 	}
 	return
 }

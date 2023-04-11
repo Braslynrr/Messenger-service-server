@@ -93,3 +93,13 @@ func (UM *UserManager) GetUser(user user.User) (returnedUser *user.User, err err
 
 	return
 }
+
+// Check if user has an active token
+func (UM *UserManager) HasTokenAccess(user user.User) string {
+	for token, tuser := range UM.tokenList {
+		if tuser.IsEqual(&user) {
+			return token
+		}
+	}
+	return ""
+}

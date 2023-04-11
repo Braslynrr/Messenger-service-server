@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/mapstructure"
 	cors "github.com/rs/cors/wrapper/gin"
@@ -283,8 +284,8 @@ func (ms *MessengerService) seenMessage(conn *socket.Socket, id string) (err err
 }
 
 // GetPage Return the Test page
-func (ms *MessengerService) getPage(c *gin.Context) {
-	c.File("../../ServerFiles/html/websockets.html")
+func (ms *MessengerService) getCodes(c *gin.Context) {
+	c.File("../../ServerFiles/countrycodes/CountryCodes.json")
 }
 
 // returns a key generated on GetPage
@@ -389,15 +390,14 @@ func (ms *MessengerService) SetupServer(IsEncrypted bool) (router *gin.Engine, e
 		router.POST("/User/Login", utils.DecryptMiddleWare(IsEncrypted), userserviceapi.Login, utils.EncryptMiddleWare(IsEncrypted))
 		router.GET("/User/:zone/:number", userserviceapi.GetUser, utils.EncryptMiddleWare(IsEncrypted))
 		router.GET("/Groups/:zone/:number", userserviceapi.GetGroups, utils.EncryptMiddleWare(IsEncrypted))
+		router.GET("/CountryCodes", ms.getCodes)
 
 		handler := ms.newSocketIo()
 
 		router.GET("/socket.io/*any", gin.WrapH(handler))
 		router.POST("/socket.io/*any", gin.WrapH(handler))
 
-		router.StaticFS("/static", http.Dir("../../ServerFiles"))
-
-		router.GET("/", ms.getPage)
+		router.Use(static.Serve("/", static.LocalFile("../../ServerFiles/messenger-ui/build", true)))
 	} else {
 		err = errors.New("messenger manager is not initialized")
 	}

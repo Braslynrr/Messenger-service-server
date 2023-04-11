@@ -1,11 +1,16 @@
 BINARY_NAME=MessengerService.exe
-
 ## build: builds all binaries
-build:
+
+build_front:
+	@cd ServerFiles\messenger-ui && yarn build
+	@cd ..\.. &
+	@echo front end build
+
+build_server:
 	@go build -o ./Endpoint/main/${BINARY_NAME} ./Endpoint/main
 	@echo back end built!
 
-run: build
+run: build_front build_server
 	@echo Starting...
 	@cd Endpoint\main && start /min /b "" ${BINARY_NAME}
 	@cd ..\..\ &
