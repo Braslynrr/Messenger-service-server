@@ -14,9 +14,9 @@ import (
 )
 
 // CheckGroup checks if a group/chat exists
-func CheckGroup(user *user.User, to []*user.User, client *mongo.Client, ctx context.Context) (id any, err error) {
+func CheckGroup(owner *user.User, to []*user.User, client *mongo.Client, ctx context.Context) (id any, err error) {
 	collection := client.Database("Messenger").Collection("Messages")
-	members := append(to, user)
+	members := append([]*user.User{owner}, to...)
 	filters := bson.M{"members": bson.M{"$size": len(members), "$all": members}}
 	result := collection.FindOne(ctx, filters)
 	group := &group.Group{}
@@ -25,15 +25,16 @@ func CheckGroup(user *user.User, to []*user.User, client *mongo.Client, ctx cont
 }
 
 // CreateGroup creates a new chat/group
-func CreateGroup(user *user.User, to []*user.User, client *mongo.Client, ctx context.Context) (id any, err error) {
+func CreateGroup(owner *user.User, to []*user.User, client *mongo.Client, ctx context.Context) (id any, err error) {
 	collection := client.Database("Messenger").Collection("Messages")
-	members := append(to, user)
+	members := append([]*user.User{owner}, to...)
 	group, err := group.NewGroup(members...)
 	if err == nil {
 
 		var dbgroup *mongo.InsertOneResult
 		dbgroup, err = collection.InsertOne(ctx, group)
 		id = dbgroup.InsertedID
+
 	}
 
 	return
@@ -53,7 +54,7 @@ func SaveMessage(message *message.Message, client *mongo.Client, ctx context.Con
 func GetGroup(ID primitive.ObjectID, client *mongo.Client, ctx context.Context) (serverGroup *group.Group, err error) {
 	serverGroup = &group.Group{}
 	collection := client.Database("Messenger").Collection("Messages")
-	filters := bson.M{"_ID": ID}
+	filters := bson.M{"_id": ID}
 	result := collection.FindOne(ctx, filters)
 	err = result.Decode(serverGroup)
 	if err == nil {

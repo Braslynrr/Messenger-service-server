@@ -1,15 +1,14 @@
 import {useState,useEffect} from 'react';
-import User from '../models/User';
+import {User} from '../models/User';
 import CountryCode from '../models/countrycode';
-import {  redirect } from 'react-router-dom';
+import {  useNavigate  } from 'react-router-dom';
 
 
 function LogInForm(){
 
   const [countryCodes,setCountryCodes] = useState<CountryCode[]>([])
   const [user,setUser] = useState<User>(new User("+506"))
-  // const [token,setToken] = useState<string>("")
-  //const {Key} = useOutletContext<any>()
+  const navigate = useNavigate()
   useEffect(() => {
     const header = new Headers()
     
@@ -26,7 +25,7 @@ function LogInForm(){
 
   },[])
 
-  function Login(){
+  async function Login(){
     const header = new Headers()
   
     header.append("Content-Type","application/json")
@@ -35,12 +34,16 @@ function LogInForm(){
        headers: header, 
        body: JSON.stringify(user)
     }
+    const req = await fetch("/User/Login",body);
 
-    fetch("/User/Login",body).then(promise=>promise.json()).then(data =>{
-      //setToken(data.token)
-      redirect("/Messenger")
-    }).catch(error=> console.log(error))
-  
+    const data =await req.json()
+
+    sessionStorage.setItem("token",data.token) 
+    
+    if(sessionStorage.token.length!==0){
+      navigate("/Messenger")
+    }
+ 
   }
 
     return(

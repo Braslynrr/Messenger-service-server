@@ -152,6 +152,10 @@ func (dbs DbService) CheckGroup(user *user.User, to []*user.User) (ID primitive.
 	var groupID any
 	var ok bool
 	user.LeaveMinimalInformation()
+	for _, us := range to {
+		us.LeaveMinimalInformation()
+	}
+
 	err = dbs.connect()
 	if err == nil {
 		groupID, err = dbgroup.CheckGroup(user, to, dbs.dbclient, dbs.dbcontext)
@@ -170,9 +174,10 @@ func (dbs DbService) CheckGroup(user *user.User, to []*user.User) (ID primitive.
 func (dbs DbService) CreateGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
 	var groupID any
 	var ok bool
-	user.UserName = ""
-	user.Password = ""
-	user.State = ""
+	user.LeaveMinimalInformation()
+	for _, v := range to {
+		v.LeaveMinimalInformation()
+	}
 	err = dbs.connect()
 	if err == nil {
 		groupID, err = dbgroup.CreateGroup(user, to, dbs.dbclient, dbs.dbcontext)

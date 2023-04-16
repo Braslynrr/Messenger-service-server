@@ -7,7 +7,7 @@ import { createBrowserRouter,RouterProvider } from 'react-router-dom';
 import NotFound from './components/NotFound';
 import LoginForm from './components/Loginform';
 import SignUpForm from './components/Signupform';
-import Messenger from './components/Messenger';
+import Messenger from './pages/Messenger';
 
 const router = createBrowserRouter([
   {

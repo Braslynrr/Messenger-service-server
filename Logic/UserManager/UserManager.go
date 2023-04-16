@@ -10,15 +10,20 @@ import (
 	"github.com/zishang520/socket.io/socket"
 )
 
+type token struct {
+	User   *user.User
+	tikcer *time.Ticker
+}
+
 type UserManager struct {
-	tokenList map[string]*user.User
+	tokenList map[string]*token
 	UserList  map[string]*user.User
 	dbservice dbservice.DbInterface
 }
 
 // NewUserManger creates a new UserManager
 func NewUserManger(dbs dbservice.DbInterface) *UserManager {
-	return &UserManager{tokenList: make(map[string]*user.User), UserList: make(map[string]*user.User), dbservice: dbs}
+	return &UserManager{tokenList: make(map[string]*token), UserList: make(map[string]*user.User), dbservice: dbs}
 }
 
 // InsertUser calls DBservice.InsertUser to insert a user to the DB
@@ -43,21 +48,20 @@ func (UM *UserManager) Login(user user.User) (ok *user.User, err error) {
 }
 
 // GenerateToken Generates a new token and assing it to a user
-func (UM *UserManager) FakeGenerateToken(user *user.User, token string) (err error) {
-	UM.tokenList[token] = user
+func (UM *UserManager) FakeGenerateToken(user *user.User, stringtoken string) (err error) {
+	UM.tokenList[stringtoken] = &token{User: user, tikcer: time.NewTicker(5 * time.Minute)}
 	return
 }
 
 // GenerateToken Generates a new token and assing it to a user
-func (UM *UserManager) GenerateToken(user *user.User) (token string, err error) {
-	token, err = utils.GenerateToken()
+func (UM *UserManager) GenerateToken(user *user.User) (stringtoken string, err error) {
+	stringtoken, err = utils.GenerateToken()
 	if err == nil {
-		UM.tokenList[token] = user
-		ticker := time.NewTicker(5 * time.Minute)
+		UM.tokenList[stringtoken] = &token{User: user, tikcer: time.NewTicker(5 * time.Minute)}
 
 		go func() {
-			for range ticker.C {
-				delete(UM.tokenList, token)
+			for range UM.tokenList[stringtoken].tikcer.C {
+				delete(UM.tokenList, stringtoken)
 			}
 		}()
 	}
@@ -66,7 +70,7 @@ func (UM *UserManager) GenerateToken(user *user.User) (token string, err error) 
 
 // ProcessToken Process a token and put it on current userList
 func (UM *UserManager) ProcessToken(token string) (*user.User, error) {
-	if user := UM.tokenList[token]; user != nil {
+	if user := UM.tokenList[token].User; user != nil {
 		UM.UserList[user.Zone+user.Number] = user
 		return user, nil
 	}
@@ -94,12 +98,16 @@ func (UM *UserManager) GetUser(user user.User) (returnedUser *user.User, err err
 	return
 }
 
-// Check if user has an active token
+// HasTokenAccess Checks if user has an active token
 func (UM *UserManager) HasTokenAccess(user user.User) string {
 	for token, tuser := range UM.tokenList {
-		if tuser.IsEqual(&user) {
+		if tuser.User.IsEqual(&user) {
 			return token
 		}
 	}
 	return ""
+}
+
+func (UM *UserManager) ResetTicker(stringtoken string) {
+	UM.tokenList[stringtoken].tikcer.Reset(5 * time.Minute)
 }

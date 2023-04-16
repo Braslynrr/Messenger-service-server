@@ -5,7 +5,14 @@ module.exports = {
   ],
   theme: {
     safelist: ['animate-[fade-in_1s_ease-in-out]',],
-    extend: {},
+    extend: {
+      width:{
+        "almost-full":"99%",
+      },
+      height:{
+        "almost-full":"99%",
+      }
+    },
   },
   plugins: [],
 }

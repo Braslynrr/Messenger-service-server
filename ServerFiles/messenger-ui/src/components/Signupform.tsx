@@ -1,5 +1,5 @@
 import {useState,useEffect} from 'react';
-import User from '../models/User'
+import {User} from '../models/User'
 import CountryCode from '../models/countrycode';
 //import { useOutletContext } from 'react-router-dom';
 
@@ -53,14 +53,14 @@ function SignUpForm(){
         </div>
 
         <div className="mb-4 flex">
-          <select value={user.zone} onChange={(event)=>setUser(new User(event.target.value.split(" ")[0],user.number,user.state,user.userName,user.password))} className=" shadow w-1/4 border rounded py-2 px-3 bg-gray-900 border-opacity-50 text-white  focus:border-blue-500 focus:outline-none focus:shadow-outline">
+          <select value={user.zone} onChange={(event)=>setUser(new User(event.target.value.split(" ")[0],user.number,user.state,user.username,user.password))} className=" shadow w-1/4 border rounded py-2 px-3 bg-gray-900 border-opacity-50 text-white  focus:border-blue-500 focus:outline-none focus:shadow-outline">
             {countryCodes.map(x=> <option value={x.dial_code} key={x.name}>{`${x.dial_code} (${x.name})`}</option>)}
           </select>
           <div className=" w-1/12"/>
           <label className='relative'>
           <input type='text' className="shadow appearance-none border rounded w-full py-2 px-3  bg-gray-900 border-opacity-50 text-white border-white focus:border-blue-500 focus:outline-none focus:shadow-outline transition duration-200"
             value={user.number}
-            onChange={(event)=>setUser(new User(user.zone,event.target.value,user.state,user.userName,user.password))}/>
+            onChange={(event)=>setUser(new User(user.zone,event.target.value,user.state,user.username,user.password))}/>
             <span className="text-white absolute left-2 top-2 text-opacity-80 transition duration-200 input-text">Number</span>
           </label>
         </div>
@@ -68,7 +68,7 @@ function SignUpForm(){
         <div className="mb-4">
         <label className='relative'>
           <input type='text' className="shadow appearance-none border rounded w-full py-2 px-3  bg-gray-900 border-opacity-50 text-white border-white focus:border-blue-500 focus:outline-none focus:shadow-outline transition duration-200"
-            value={user.userName}
+            value={user.username}
             onChange={(event)=>setUser(new User(user.zone,user.number,user.state,event.target.value,user.password))}/>
             <span className="text-white absolute left-2 -top-0.5 text-opacity-80 transition duration-200 input-text">User Name</span>
           </label>
@@ -78,7 +78,7 @@ function SignUpForm(){
         <label className='relative'>
           <textarea id="state" name="state" rows={3} className="shadow appearance-none border rounded w-full py-2 px-3  bg-gray-900 border-opacity-50 text-white border-white focus:border-blue-500 focus:outline-none focus:shadow-outline transition duration-200"
           value={user.state}
-          onChange={(event)=>setUser(new User(user.zone,user.number,event.target.value,user.userName,user.password))}/>
+          onChange={(event)=>setUser(new User(user.zone,user.number,event.target.value,user.username,user.password))}/>
           <span className="text-white absolute left-2 text-opacity-80 transition duration-200 input-text">About</span>
           </label>
         </div>
@@ -87,7 +87,7 @@ function SignUpForm(){
         <label className='relative'>
           <input type='password' className="shadow appearance-none border rounded w-full py-2 px-3  bg-gray-900 border-opacity-50 text-white border-white focus:border-blue-500 focus:outline-none focus:shadow-outline transition duration-200"
             value={user.password}
-            onChange={(event)=>setUser(new User(user.zone,user.number,user.state,user.userName,event.target.value))}/>
+            onChange={(event)=>setUser(new User(user.zone,user.number,user.state,user.username,event.target.value))}/>
             <span className="text-white absolute left-2 -top-0.5 text-opacity-80 transition duration-200 input-text">Password</span>
           </label>
 

@@ -13,3 +13,10 @@ input[type="password"]:not(input[value=""]) ~ .input-text{
 textarea:not(:empty) ~ .input-text{
     @apply text-blue-500 bg-gray-900 transform -translate-y-0.5 -translate-x-2 scale-75;
 }
+
+input[type="text"]:not(input[value=""]) ~ .input-text2{
+    @apply text-blue-800 font-semibold bg-transparent transform -translate-y-7 -translate-x-2 scale-100
+    
+    
+    ;
+}
