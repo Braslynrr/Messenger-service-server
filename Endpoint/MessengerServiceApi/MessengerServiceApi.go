@@ -24,6 +24,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type GeneralNotification struct {
+	data             any
+	soketID          socket.SocketId
+	NotificationType string
+}
+
 type SocketMessage struct {
 	message     *msmessage.Message
 	socket      socket.SocketId
@@ -36,16 +42,19 @@ type SocketError struct {
 }
 
 type MessengerService struct {
-	Sender    chan *SocketMessage
-	ErrorChan chan SocketError
-	DoneChan  chan bool
-	Wait      *sync.WaitGroup
-	sockets   map[socket.SocketId]*socket.Socket
-	Logger    *log.Logger
-	ErrorLog  *log.Logger
-	socketIO  *socket.Server
-	DbService dbservice.DbInterface
-	Sesion    gin.HandlerFunc
+	MessageSender   chan *SocketMessage
+	ErrorChan       chan SocketError
+	NotifyChan      chan *GeneralNotification
+	MessageDoneChan chan bool
+	ErrorDoneChan   chan bool
+	NotifyDoneChan  chan bool
+	Wait            *sync.WaitGroup
+	sockets         map[socket.SocketId]*socket.Socket
+	Logger          *log.Logger
+	ErrorLog        *log.Logger
+	socketIO        *socket.Server
+	DbService       dbservice.DbInterface
+	Sesion          gin.HandlerFunc
 }
 
 // GetPage Return the Test page
@@ -170,6 +179,7 @@ func (ms *MessengerService) SetupServer(IsEncrypted bool) (router *gin.Engine, e
 		router.GET("/Key", ms.getKey)
 		router.POST("/User", utils.DecryptMiddleWare(IsEncrypted), userserviceapi.NewUser, utils.EncryptMiddleWare(IsEncrypted))
 		router.POST("/User/Login", utils.DecryptMiddleWare(IsEncrypted), userserviceapi.Login, utils.EncryptMiddleWare(IsEncrypted))
+		router.POST("/User/ProfileImage", userserviceapi.UploadFile)
 		router.GET("/User/:zone/:number", userserviceapi.GetUser, utils.EncryptMiddleWare(IsEncrypted))
 		router.GET("/Groups/:zone/:number", userserviceapi.GetGroups, utils.EncryptMiddleWare(IsEncrypted))
 		router.POST("Groups/Messages", utils.DecryptMiddleWare(IsEncrypted), ms.GetMessages, utils.EncryptMiddleWare(IsEncrypted))
@@ -187,29 +197,64 @@ func (ms *MessengerService) SetupServer(IsEncrypted bool) (router *gin.Engine, e
 	return
 }
 
-var socketLock sync.Mutex
-
 // MessageAndNotificationsnSender send some messages and notifications in background
 func (ms *MessengerService) MessageAndNotificationsnSender() {
+	ms.Wait.Add(3)
+	go ms.messageNotifications()
+	go ms.generalNotifications()
+	go ms.errorNotifications()
+	ms.Wait.Wait()
+}
+
+func (ms *MessengerService) messageNotifications() {
+	defer ms.Wait.Done()
 	for {
 		select {
-		case msg := <-ms.Sender:
+		case msg := <-ms.MessageSender:
 			if ms.sockets[msg.socket] != nil && ms.sockets[msg.socket].Connected() {
 				usercontext := ms.sockets[msg.socket].Data().(gin.H)
 				encyptedMessage, err := utils.EncryptInterface(msg.message, usercontext["key"].(string))
 				if err == nil {
 					ms.Logger.Printf("Sending %s to %v", msg.messageType, msg.socket)
-					socketLock.Lock()
 					ms.sockets[msg.socket].Emit(msg.messageType, encyptedMessage)
-					socketLock.Unlock()
+				} else {
+					ms.ErrorChan <- SocketError{err: err, errorType: "", socket: ms.sockets[msg.socket]}
 				}
 			}
+		case <-ms.MessageDoneChan:
+			return
+		}
+	}
+
+}
+
+func (ms *MessengerService) generalNotifications() {
+	defer ms.Wait.Done()
+	for {
+		select {
+		case noti := <-ms.NotifyChan:
+			if ms.sockets[noti.soketID] != nil && ms.sockets[noti.soketID].Connected() {
+
+				ms.Logger.Printf("Notifying %s to %v", noti.NotificationType, noti.soketID)
+				ms.sockets[noti.soketID].Emit(noti.NotificationType, noti.data)
+
+			}
+		case <-ms.NotifyDoneChan:
+			return
+		}
+	}
+}
+
+func (ms *MessengerService) errorNotifications() {
+	defer ms.Wait.Done()
+	for {
+		select {
 		case err := <-ms.ErrorChan:
 			ms.ErrorLog.Println("Error:", err.err.Error(), " from ", err.socket.Id())
 			if err.socket.Connected() {
 				err.socket.Emit(err.errorType, gin.H{"Error": err.err.Error()})
 			}
-		case <-ms.DoneChan:
+		case <-ms.ErrorDoneChan:
 			return
 		}
 	}
@@ -234,12 +279,23 @@ func (ms *MessengerService) ShutDown() {
 	ms.socketIO.Clear()
 	ms.socketIO = nil
 
+	ms.ErrorDoneChan <- true
+	ms.MessageDoneChan <- true
+	ms.NotifyDoneChan <- true
+
 	ms.Wait.Wait()
 
 	ms.Logger.Println("Closign Channels and shutting down the server...")
-	close(ms.Sender)
+
 	close(ms.ErrorChan)
-	close(ms.DoneChan)
+	close(ms.ErrorDoneChan)
+
+	close(ms.MessageSender)
+	close(ms.MessageDoneChan)
+
+	close(ms.NotifyChan)
+	close(ms.NotifyDoneChan)
+
 	ms.sockets = nil
 
 }

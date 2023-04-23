@@ -10,6 +10,8 @@ use (
 	./Logic/GroupManager
 	./Logic/MessengerManager
 	./Logic/UserManager
+
+	./Micro/MicroBlob/
 	./Model/Group
 	./Model/Message
 	./Model/User

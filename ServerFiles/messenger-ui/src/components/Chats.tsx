@@ -3,8 +3,10 @@ import Group from "../models/Group";
 import {User} from "../models/User";
 import GroupInfo from "./GroupInfo";
 import NewMessageModal from "./NewMessageModal";
+import { Socket } from "socket.io-client";
+import { DefaultEventsMap } from "socket.io/dist/typed-events";
 
-function Chats({user,groups,onSetGroup}:{user:User,groups:Group[],onSetGroup:(group: SetStateAction<Group|undefined>) => void}){
+function Chats({user,groups,onSetGroup,client}:{user:User,groups:Group[],onSetGroup:(group: SetStateAction<Group|undefined>) => void,client:Socket<DefaultEventsMap,DefaultEventsMap>}){
 
 const [showModal, setShowModal] = useState<boolean>(false);
 
@@ -14,7 +16,7 @@ const updateModal = useCallback((group: SetStateAction<boolean>) => {
 
 return(
     <Fragment>
-    {showModal && <NewMessageModal onSetGroup={onSetGroup}  user={user}  setOpenModal={updateModal} />}
+    {showModal && <NewMessageModal client={client} onSetGroup={onSetGroup}  user={user}  setOpenModal={updateModal} />}
     <div className="h-almost-full w-almost-full shadow-lg bg-white rounded-lg z-50">
         <div className="h-full w-full flex flex-col">
             <div className="flex">

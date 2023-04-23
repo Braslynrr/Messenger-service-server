@@ -4,6 +4,7 @@ const WSOutRequest = {
     sendSeen: 'SendSeen',
     disconnect: 'disconnect',
     getHistory:"GroupHistory",
+    createGroup:"CreateGroup"
   };
 
   const WSInRequest = {
@@ -16,5 +17,6 @@ const WSOutRequest = {
     newGroup:'NewGroup',
     newMessage:"NewMessage",
     error:"error",
+    disconnect:"disconnect"
   };
   export  {WSOutRequest,WSInRequest};

@@ -24,8 +24,8 @@ func CheckGroup(owner *user.User, to []*user.User, client *mongo.Client, ctx con
 	return group.ID, err
 }
 
-// CreateGroup creates a new chat/group
-func CreateGroup(owner *user.User, to []*user.User, client *mongo.Client, ctx context.Context) (id any, err error) {
+// CreateGroupByUsers creates a new chat/group using users
+func CreateGroupByUsers(owner *user.User, to []*user.User, client *mongo.Client, ctx context.Context) (id any, err error) {
 	collection := client.Database("Messenger").Collection("Messages")
 	members := append([]*user.User{owner}, to...)
 	group, err := group.NewGroup(members...)
@@ -36,6 +36,16 @@ func CreateGroup(owner *user.User, to []*user.User, client *mongo.Client, ctx co
 		id = dbgroup.InsertedID
 
 	}
+
+	return
+}
+
+// CreateGroupByUsers creates a new chat/group using users
+func CreateGroup(ingroup *group.Group, client *mongo.Client, ctx context.Context) (id any, err error) {
+	collection := client.Database("Messenger").Collection("Messages")
+	var dbgroup *mongo.InsertOneResult
+	dbgroup, err = collection.InsertOne(ctx, ingroup)
+	id = dbgroup.InsertedID
 
 	return
 }

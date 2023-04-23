@@ -17,6 +17,9 @@ textarea:not(:empty) ~ .input-text{
 input[type="text"]:not(input[value=""]) ~ .input-text2{
     @apply text-blue-800 font-semibold bg-transparent transform -translate-y-7 -translate-x-2 scale-100
     
-    
     ;
+}
+
+textarea:not(:empty) ~ .input-text2{
+    @apply text-blue-800 font-semibold bg-transparent transform -translate-y-6 -translate-x-2 scale-100;
 }

@@ -1,6 +1,7 @@
 package messengerserviceapi
 
 import (
+	messengermanager "MessengerService/mesermanager"
 	"errors"
 
 	"github.com/gin-gonic/gin"
@@ -14,14 +15,26 @@ func hasUserMiddleware[T any](conn *socket.Socket, next func(*socket.Socket, T) 
 	contextMap, ok := context.(gin.H)
 	if ok {
 		arg, ok := args[0].(T)
-		if ok && contextMap["user"] != nil {
-			// todo: Reset Tiker
 
-			return next(conn, arg)
+		if ok && contextMap["user"] != nil {
+			token, ok := conn.Handshake().Query.Get("token")
+			if ok {
+				mm, err := messengermanager.NewMessengerManager(nil)
+				if err == nil {
+					// Reset Tiker
+					err = mm.ResetUserTime(token)
+
+					if err == nil {
+						return next(conn, arg)
+					}
+				}
+			}
+
+		} else {
+			return errors.New("incorrect object sent")
 		}
 
 	}
-
 	return errors.New("the connection should be bound to a token")
 }
 
@@ -30,10 +43,19 @@ func hasUserMiddlewareNoParam(conn *socket.Socket, next func(*socket.Socket) err
 	context := conn.Data()
 	contextMap, ok := context.(gin.H)
 	if ok && contextMap["user"] != nil {
+		token, ok := conn.Handshake().Query.Get("token")
+		if ok {
+			mm, err := messengermanager.NewMessengerManager(nil)
+			if err == nil {
+				// Reset Tiker
+				err = mm.ResetUserTime(token)
 
-		// todo: Reset Tiker
-
-		return next(conn)
+				if err == nil {
+					return next(conn)
+				}
+			}
+			return err
+		}
 	}
 
 	return errors.New("connection should be bound to a token")

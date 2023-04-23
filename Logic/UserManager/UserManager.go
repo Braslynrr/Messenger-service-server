@@ -70,11 +70,12 @@ func (UM *UserManager) GenerateToken(user *user.User) (stringtoken string, err e
 
 // ProcessToken Process a token and put it on current userList
 func (UM *UserManager) ProcessToken(token string) (*user.User, error) {
-	if user := UM.tokenList[token].User; user != nil {
-		UM.UserList[user.Zone+user.Number] = user
-		return user, nil
+	if UM.tokenList[token] != nil {
+		if user := UM.tokenList[token].User; user != nil {
+			UM.UserList[user.Zone+user.Number] = user
+			return user, nil
+		}
 	}
-
 	return nil, errors.New("invalid token")
 }
 
@@ -108,6 +109,29 @@ func (UM *UserManager) HasTokenAccess(user user.User) string {
 	return ""
 }
 
-func (UM *UserManager) ResetTicker(stringtoken string) {
-	UM.tokenList[stringtoken].tikcer.Reset(5 * time.Minute)
+// ResetTicker resets user's ticker
+func (UM *UserManager) ResetTicker(stringtoken string) (err error) {
+	if UM.tokenList[stringtoken] != nil {
+		UM.tokenList[stringtoken].tikcer.Reset(5 * time.Minute)
+		return
+	}
+	return errors.New("session has expired")
+}
+
+// UpdateUser updates an user
+func (UM *UserManager) UpdateUser(user *user.User) (err error) {
+
+	err = UM.dbservice.UpdateUser(user)
+	if err == nil {
+		go func() {
+			for token, us := range UM.tokenList {
+				if us.User.IsEqual(user) {
+					UM.tokenList[token].User = user
+					return
+				}
+			}
+		}()
+	}
+
+	return
 }

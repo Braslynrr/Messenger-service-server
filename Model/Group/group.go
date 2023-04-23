@@ -6,7 +6,7 @@ import (
 )
 
 type Group struct {
-	ID          any          `bson:"_id,omitempty" json:"id"`
+	ID          any          `bson:"_id,omitempty" json:"id,omitempty"`
 	Members     []*user.User `json:"members"`
 	GroupName   string       `json:"groupName"`
 	Description string       `json:"description"`

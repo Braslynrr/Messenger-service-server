@@ -1,15 +1,17 @@
 package utils
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
+	"unicode"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -114,7 +116,7 @@ func EncryptInterface(something any, key string) (encrypted string, err error) {
 // EncryptMiddleWare encrypts the body before send it
 func EncryptMiddleWare(EncryptedEnabled bool) gin.HandlerFunc {
 	return func(ctx *gin.Context) { // pending to fix
-		if EncryptedEnabled {
+		if EncryptedEnabled && ctx.Writer.Status() == http.StatusOK {
 
 			ctx.Done()
 
@@ -133,8 +135,10 @@ func EncryptMiddleWare(EncryptedEnabled bool) gin.HandlerFunc {
 
 			newBody := base64.StdEncoding.EncodeToString(encryptedBody)
 
-			ctx.Request.Body = ioutil.NopCloser(bytes.NewReader([]byte(newBody)))
+			ctx.Writer.WriteHeader(http.StatusOK)
+			ctx.Writer.Write([]byte{})
 
+			ctx.String(http.StatusOK, newBody)
 		}
 		ctx.Next()
 	}
@@ -159,9 +163,25 @@ func DecryptMiddleWare(EncryptedEnabled bool) gin.HandlerFunc {
 
 			decryptedBody, err := decrypt_aes_cbc([]byte(newBody), []byte(key))
 
-			ctx.Request.Body = ioutil.NopCloser(bytes.NewReader([]byte(decryptedBody)))
+			ctx.Request.Body = io.NopCloser(strings.NewReader(string(decryptedBody)))
 
 		}
 		ctx.Next()
 	}
+}
+
+// hasNumber checks if rune is a digit
+func HasNumber(r rune) bool {
+	return unicode.IsDigit(r)
+}
+
+// filterString filters a string using a function of rune
+func FilterString(s string, f func(rune) bool) string {
+	var filtered string
+	for _, r := range s {
+		if f(r) {
+			filtered += string(r)
+		}
+	}
+	return filtered
 }

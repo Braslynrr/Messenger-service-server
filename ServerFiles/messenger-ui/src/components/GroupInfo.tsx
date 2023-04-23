@@ -13,11 +13,12 @@ function GroupInfo({ user, group,onSetGroup }: { user: User, group: Group , onSe
             return `${msg?.content.substring(0,45)}...`
         }
 
-        return msg?.content||""
+        return msg===undefined? "" : `:${msg?.content}`||""
     }
 
     function ProcessOwner(msg?:Message):string{
-        
+        if(msg===undefined)
+            return ""
         return group.members.find(member=> member.zone=== msg?.from.zone && member.number=== msg?.from.number && member.zone!== user.zone && member.number !== user.number)?.username||"You"
     }
 
@@ -46,7 +47,7 @@ function GroupInfo({ user, group,onSetGroup }: { user: User, group: Group , onSe
                     <span className=" text-blue-700 text-[12px]"> {group.members.reduce((members, member) => members + `${member.zone} ${member.number} `, "").replace(`${user.zone} ${user.number}`,group.members.length > 2?"You":"")}</span>
                 </div>
                 <div>
-                   <span className="text-red-600 italic text-sm font-semibold">{group.messages!==undefined && `${group.messages && ProcessOwner(group.messages[group.messages.length-1])}: ` }</span><span className="italic text-sm" >{group.messages &&  ProcessMessage(group.messages[group.messages.length-1])}</span>
+                   <span className="text-red-600 italic text-sm font-semibold">{group.messages!==undefined && `${group.messages && ProcessOwner(group.messages[group.messages.length-1])}` }</span><span className="italic text-sm" >{group.messages &&  ProcessMessage(group.messages[group.messages.length-1])}</span>
                 </div>
             </div>
             {newMessages>0 && <div className="bg-red-500 rounded-full h-7 w-7 text-white animate-pulse text-center font-semibold my-1 mx-1">{newMessages}</div>}

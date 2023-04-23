@@ -22,53 +22,66 @@ func (ms *MessengerService) newSocketIo() http.Handler {
 	ms.socketIO = socket.NewServer(nil, nil)
 
 	ms.socketIO.On("connection", func(clients ...any) {
+		var err error
+
 		client := clients[0].(*socket.Socket)
 
 		ms.Logger.Printf("New Connection: %v", client.Id())
 
-		client.On("Login", func(data ...any) {
-			var err error
-
-			if err == nil {
+		if client.Handshake().Query != nil {
+			token, ok := client.Handshake().Query.Get("token")
+			if ok {
 
 				WSKey, _ := utils.GenerateRandomAESKey(16)
 				ms.Logger.Printf("Sending key: %v", client.Id())
 				client.Emit("WSKey", WSKey)
 				client.SetData(WSKey)
 
-				token, ok := data[0].(string)
-				if ok {
-					ms.connectToMessengerService(client, token)
+				if ms.connectToMessengerService(client, token) {
 					ms.sockets[client.Id()] = client
+
+					// options
+					client.On("sendMessage", func(message ...any) {
+
+						ms.handleError(client, "", hasUserMiddleware(client, ms.sendMessage, message...))
+					})
+
+					client.On("GetCurrentGroups", func(...any) {
+						ms.handleError(client, "", hasUserMiddlewareNoParam(client, ms.getGroups))
+					})
+
+					client.On("GroupHistory", func(history ...any) {
+						ms.handleError(client, "", hasUserMiddleware(client, ms.getGroupHistory, history...))
+					})
+
+					client.On("SendSeen", func(SeenMesage ...any) {
+						ms.handleError(client, "", hasUserMiddleware(client, ms.seenMessage, SeenMesage...))
+					})
+
+					client.On("CreateGroup", func(group ...any) {
+						ms.handleError(client, "", hasUserMiddleware(client, ms.createGroup, group...))
+					})
+					client.On("disconnect", func(reason ...any) {
+						ms.Logger.Printf("%s is disconnecting because %v ", client.Id(), reason[0])
+						client.Disconnect(true)
+						delete(ms.sockets, client.Id())
+					})
+				} else {
+					err = errors.New("could not connect, invalid token")
 				}
+
 			} else {
-				err = errors.New("object sent is not a token")
+				err = errors.New("token was not sent")
 			}
+
+		} else {
+			err = errors.New("it's necessary send a query")
+		}
+
+		if err != nil {
 			ms.handleError(client, "", err)
-		})
-
-		client.On("sendMessage", func(message ...any) {
-
-			ms.handleError(client, "", hasUserMiddleware(client, ms.sendMessage, message...))
-		})
-
-		client.On("GetCurrentGroups", func(...any) {
-			ms.handleError(client, "", hasUserMiddlewareNoParam(client, ms.getGroups))
-		})
-
-		client.On("GroupHistory", func(history ...any) {
-			ms.handleError(client, "", hasUserMiddleware(client, ms.getGroupHistory, history...))
-		})
-
-		client.On("SendSeen", func(SeenMesage ...any) {
-			ms.handleError(client, "", hasUserMiddleware(client, ms.seenMessage, SeenMesage...))
-		})
-
-		client.On("disconnect", func(reason ...any) {
-			ms.Logger.Printf("%s is disconnecting because %v ", client.Id(), reason[0])
 			client.Disconnect(true)
-			delete(ms.sockets, client.Id())
-		})
+		}
 
 	})
 
@@ -83,7 +96,7 @@ func (ms *MessengerService) handleError(conn *socket.Socket, errortype string, e
 }
 
 // ConnectToMessengerService connects a user to Online channel using a token
-func (ms *MessengerService) connectToMessengerService(conn *socket.Socket, token string) {
+func (ms *MessengerService) connectToMessengerService(conn *socket.Socket, token string) bool {
 	var err error
 	var user *user.User
 
@@ -93,15 +106,24 @@ func (ms *MessengerService) connectToMessengerService(conn *socket.Socket, token
 		user, err = MS.HasTokenAccess(token)
 		if err == nil {
 			AESkey := fmt.Sprintf("%v", conn.Data())
+
+			// Removing socket past socket
+			if ms.sockets[user.GetSocket()] != nil && user.GetSocket() != conn.Id() {
+				ms.Logger.Printf("Disconnecting %s client", user.GetSocket())
+				ms.sockets[user.GetSocket()].Disconnect(true)
+				delete(ms.sockets, user.GetSocket())
+			}
+
 			user.SetSocketID(conn.Id())
 			conn.SetData(gin.H{"key": AESkey, "user": *user})
 			conn.Join("Online")
 			ms.Logger.Printf("Sending User to %s", conn.Id())
 			conn.Emit("Log In", user)
-			return
+			return true
 		}
 	}
 	ms.handleError(conn, "Login", err)
+	return false
 }
 
 // sendMessage sends a message to group or chat
@@ -138,13 +160,19 @@ func (ms *MessengerService) sendMessage(conn *socket.Socket, Decryptedmessage st
 						// Checking if group
 						groupID, err = MS.CheckGroup(user, toList)
 						if err != nil {
-							groupID, err = MS.CreateGroup(user, toList)
+							groupID, err = MS.CreateGroupByUsers(user, toList)
 							if err == nil {
 
 								group, err = MS.GetGroup(groupID)
 
-								if err == nil {
-									conn.Emit("NewGroup", group)
+								socketsIDS := MS.MapUsersToSocketsID(group.Members)
+
+								if err == nil { // sending new Group to all members
+									go func() {
+										for socket := range socketsIDS {
+											ms.NotifyChan <- &GeneralNotification{soketID: socket, data: group, NotificationType: "NewGroup"}
+										}
+									}()
 								} else {
 									ms.handleError(conn, "", err)
 									return
@@ -162,7 +190,7 @@ func (ms *MessengerService) sendMessage(conn *socket.Socket, Decryptedmessage st
 
 								for key := range sockets {
 									if conn.Id() != key {
-										ms.Sender <- &SocketMessage{message: newMessage, socket: key, messageType: "NewMessage"}
+										ms.MessageSender <- &SocketMessage{message: newMessage, socket: key, messageType: "NewMessage"}
 									}
 								}
 
@@ -241,7 +269,7 @@ func (ms *MessengerService) seenMessage(conn *socket.Socket, id string) (err err
 					message.WillSendtoUser(message.From)
 					socket := MS.MapNumberToSocketID(message.From)
 					if socket != nil {
-						ms.Sender <- &SocketMessage{socket: *socket, message: &message, messageType: "ReadMessage"}
+						ms.MessageSender <- &SocketMessage{socket: *socket, message: &message, messageType: "ReadMessage"}
 					}
 				}
 
@@ -268,5 +296,40 @@ func (ms *MessengerService) getGroups(conn *socket.Socket) (err error) {
 
 	}
 	ms.handleError(conn, "", err)
+	return
+}
+
+// seenMessage marks as Read a message by this connection user
+func (ms *MessengerService) createGroup(conn *socket.Socket, maps map[string]any) (err error) {
+	var ingroup group.Group
+	var newgroup *group.Group
+	var jsonData []byte
+	jsonData, err = json.Marshal(&maps)
+	if err == nil {
+		// Convert the JSON to a struct
+		err = json.Unmarshal(jsonData, &ingroup)
+		if err == nil {
+			MS, err := messengermanager.NewMessengerManager(nil)
+
+			if err == nil {
+				ingroup.Admins = append(make([]*user.User, 0), ingroup.Members[0])
+
+				newgroup, err = MS.CreateGroup(&ingroup)
+				if err == nil {
+					socketsIDS := MS.MapUsersToSocketsID(newgroup.Members)
+
+					if err == nil { // sending new Group to all members
+						go func() {
+							for socket := range socketsIDS {
+								ms.NotifyChan <- &GeneralNotification{soketID: socket, data: newgroup, NotificationType: "NewGroup"}
+							}
+						}()
+					}
+				}
+			}
+		}
+
+	}
+
 	return
 }

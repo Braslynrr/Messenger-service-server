@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, SetStateAction } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../models/User';
-import { io } from "socket.io-client";
+import { Socket, io } from "socket.io-client";
 import UserInfo from '../components/UserInfo';
 import Chats from '../components/Chats';
 import Chat from '../components/Chat';
@@ -10,13 +10,11 @@ import { Message } from '../models/Message';
 import { decryptText, setKey } from '../Utils/Utils';
 import CryptoJS from 'crypto-js';
 import { WSInRequest, WSOutRequest } from '../models/WSEnum';
+import { DefaultEventsMap } from "socket.io/dist/typed-events";
 
+const socketUrl = '/';
 
-const socketUrl = 'http://localhost:8080/';
-const client = io(socketUrl, {
-    autoConnect: false,
-    transports: ['websocket'],
-})
+let client: Socket<DefaultEventsMap, DefaultEventsMap> | null = null
 
 function Messenger() {
 
@@ -26,17 +24,23 @@ function Messenger() {
     const [groups, setGroups] = useState<Group[]>([])
     const [selectedGroup, setSelectedGroup] = useState<Group>()
     const [online, setOnline] = useState<boolean>(false)
+
+    const HandleUserChange = useCallback((user: User) => {
+        setUser(user)
+    }, [])
+
+
     const HandleReadMessage = useCallback((message: Message) => {
         function onMessageChange(incomingMsg: Message) {
             let newGroups = [...groups]
-
+            console.log("SentMessage ", newGroups)
             let tempGroup = newGroups.find(group => group.id === incomingMsg.groupID)
 
             if (tempGroup !== undefined) {
 
                 if (tempGroup.messages !== undefined) {
 
-                    
+
                     let index = tempGroup.messages.findIndex(msg => msg.ID === incomingMsg.ID)
 
                     if (index !== undefined) {
@@ -46,13 +50,17 @@ function Messenger() {
 
                         setGroups(newGroups)
                     }
+                } else {
+                    tempGroup.messages = []
+                    tempGroup.messages.push(incomingMsg)
                 }
-
 
             }
         }
         onMessageChange(message)
     }, [groups])
+
+
     const HandleSetGroup = useCallback((group: SetStateAction<Group | undefined>) => setSelectedGroup(group), [])
 
 
@@ -91,8 +99,27 @@ function Messenger() {
 
             function SentMessage(SentMessage: any) {
                 let newGroups = [...groups]
+
                 let message = newGroups.find(group => group.id === SentMessage.message.groupid)?.messages?.find(msg => msg.ID === "")
-                if (message !== undefined) {
+
+                if (message === undefined) {
+                    message = { ...selectedGroup!.messages![0] }
+                    let listofmember = selectedGroup?.members.map(member => member.zone + member.number)
+                    let group = newGroups.find(group => group.members.every(member => listofmember?.includes(member.zone + member.number)))
+                    if (group !== undefined) {
+
+
+                        if (group.messages === undefined) {
+                            group.messages = []
+                            group.messages.push(message)
+                        } else {
+                            group.messages.push(message)
+                        }
+                        message.ID = SentMessage.message.id
+                        message.state = false
+                        setSelectedGroup(group)
+                    }
+                }else{
                     message!.ID = SentMessage.message.id
                     message.state = false
                 }
@@ -147,27 +174,29 @@ function Messenger() {
 
                 setGroups(newGroups)
             }
+            if (client !== null) {
+                client.on(WSInRequest.newGroup, NewGroup)
+                client.on(WSInRequest.sentMessage, SentMessage)
 
-            client.on(WSInRequest.newGroup, NewGroup)
-            client.on(WSInRequest.sentMessage, SentMessage)
-
-            if (key !== null) {
-
-                client.on(WSInRequest.readMessage, readMessage)
-                client.on(WSInRequest.newMessage, NewMessage)
-            }
-
-            return () => {
-                client.off(WSInRequest.newGroup, NewGroup)
-                client.off(WSInRequest.sentMessage, SentMessage)
                 if (key !== null) {
-                    client.off(WSInRequest.readMessage, readMessage)
-                    client.off(WSInRequest.newMessage, NewMessage)
+
+                    client.on(WSInRequest.readMessage, readMessage)
+                    client.on(WSInRequest.newMessage, NewMessage)
+                }
+
+            }
+            return () => {
+                if (client !== null) {
+                    client.off(WSInRequest.newGroup, NewGroup)
+                    client.off(WSInRequest.sentMessage, SentMessage)
+                    if (key !== null) {
+                        client.off(WSInRequest.readMessage, readMessage)
+                        client.off(WSInRequest.newMessage, NewMessage)
+                    }
                 }
             }
 
-
-        }, [groups, key])
+        }, [groups, key, selectedGroup])
 
     useEffect(() => {
 
@@ -197,7 +226,7 @@ function Messenger() {
                     let body = {
                         method: "POST",
                         headers: header,
-                        body: JSON.stringify({ socketID: client.id, time: new Date(), ID: group.id })
+                        body: JSON.stringify({ socketID: client!.id, time: new Date(), ID: group.id })
                     }
                     let req = await fetch("/Groups/Messages", body);
 
@@ -232,22 +261,34 @@ function Messenger() {
         }
 
         function Logout(error: any) {
-            client.disconnect()
+
+            if (client!.connected)
+                client!.disconnect()
+            sessionStorage.removeItem("token")
             navigate("/LogIn")
         }
 
-        if (sessionStorage.token == null)
-            navigate("/")
+
+        if (client === null) {
+            client = io(socketUrl, {
+                autoConnect: false,
+                transports: ['websocket'],
+                query: { "token": sessionStorage.token }
+            })
+        }
+
         client.on(WSInRequest.connect, Connected)
         client.on(WSInRequest.login, Login)
         client.on(WSInRequest.wsKey, AddKey)
         client.on("errorLogin", Logout)
         client.on(WSInRequest.error, error)
+        client.on(WSInRequest.disconnect, Logout)
 
+        if (!client.connected) {
 
-
-        if (!client.connected)
             client.connect()
+        }
+
 
         if (user.zone === "")
             client.emit(WSOutRequest.login, sessionStorage.token)
@@ -259,12 +300,14 @@ function Messenger() {
         }
 
         return () => {
-            client.off(WSInRequest.connect, Connected)
-            client.off(WSInRequest.login, Login)
-            client.off(WSInRequest.wsKey, AddKey)
-            client.off("errorLogin", Logout)
-            client.off(WSInRequest.error, error)
-
+            if (client !== null) {
+                client.off(WSInRequest.connect, Connected)
+                client.off(WSInRequest.login, Login)
+                client.off(WSInRequest.wsKey, AddKey)
+                client.off("errorLogin", Logout)
+                client.off(WSInRequest.error, error)
+                client.on(WSInRequest.disconnect, Logout)
+            }
         };
 
 
@@ -273,15 +316,15 @@ function Messenger() {
     return (<div className="h-screen w-screen text-black flex flex-row">
         <div className=" basis-full md:basis-1/4 flex flex-col space-y-1">
             <div className='justify-center items-center h-full basis-2/12 ml-1'>
-                <UserInfo user={user} online={online} />
+                <UserInfo user={user} online={online} onUserChanged={HandleUserChange} />
             </div>
             <div className='grow justify-center items-center ml-1'>
-                <Chats user={user} groups={groups} onSetGroup={HandleSetGroup} />
+                <Chats client={client!} user={user} groups={groups} onSetGroup={HandleSetGroup} />
             </div>
         </div>
         <div className="md:grow justify-center items-center">
             {key &&
-                selectedGroup ? <Chat client={client} user={user} group={selectedGroup} onSendMessage={HandleSetGroup} onMessageChanged={HandleReadMessage} /> : <div className='flex bg-gray-900 w-full h-full text-white text-center justify-center'><div className='m-auto text-2xl'>Welcome to Messenger Service</div></div>
+                selectedGroup ? <Chat client={client!} user={user} group={selectedGroup} onSendMessage={HandleSetGroup} onMessageChanged={HandleReadMessage} /> : <div className='flex bg-gray-900 w-full h-full text-white text-center justify-center'><div className='m-auto text-2xl'>Welcome to Messenger Service</div></div>
             }
         </div>
 
