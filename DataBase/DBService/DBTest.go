@@ -5,6 +5,7 @@ import (
 	"MessengerService/message"
 	"MessengerService/user"
 	"errors"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -66,12 +67,26 @@ func (dbs DbTest) CheckGroup(user *user.User, to []*user.User) (ID primitive.Obj
 }
 
 // CheckGroup creates a new one
-func (dbs *DbTest) CreateGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
+func (dbs *DbTest) CreateGroupByUsers(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
 	ID = primitive.NewObjectID()
 	to = append(to, user)
 	group, err := group.NewGroup(to...)
 	dbs.groups = append(dbs.groups, group)
 	return ID, err
+}
+
+func (dbs *DbTest) CreateGroup(ingroup *group.Group) (ouputGroup *group.Group, err error) {
+	ouputGroup = &group.Group{
+		ID:          fmt.Sprintf("%v", len(dbs.groups)+1),
+		Members:     ingroup.Members,
+		Admins:      ingroup.Admins,
+		Description: ingroup.Description,
+		GroupName:   ingroup.GroupName,
+		IsChat:      len(ingroup.Members) == 2,
+	}
+
+	dbs.groups = append(dbs.groups, ouputGroup)
+	return
 }
 
 // SaveMessage Saves message in the DB
@@ -110,4 +125,13 @@ func (dbs *DbTest) UpdateMessageReadBy(messageID primitive.ObjectID, localUser u
 		}
 	}
 	return
+}
+
+func (dbs *DbTest) UpdateUser(user *user.User) error {
+	for i := 0; i < len(dbs.users); i++ {
+		if dbs.users[i].IsEqual(user) {
+			dbs.users[i] = user
+		}
+	}
+	return errors.New("user not found")
 }

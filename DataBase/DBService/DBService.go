@@ -7,7 +7,6 @@ import (
 	"MessengerService/message"
 	"MessengerService/user"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -27,7 +26,6 @@ type DbService struct {
 }
 
 const mongoLink = "mongodb+srv://Brazza:%v@messengercluster.pgyp5zg.mongodb.net/?retryWrites=true&w=majority"
-const passwordFile = "../../DataBase/DBService/mongoPassword.json"
 
 // singleton instance
 var (
@@ -41,18 +39,8 @@ func NewDBService() (*DbService, error) {
 	defer lock.Unlock()
 
 	if instance == nil {
-
-		content, err := os.ReadFile(passwordFile)
-		if err != nil {
-			return nil, err
-		}
-		var password map[string]string
-		err = json.Unmarshal(content, &password)
-
-		if err != nil {
-			return nil, err
-		}
-		instance = &DbService{connectionLink: fmt.Sprintf(mongoLink, password["password"])}
+		password := os.Getenv("MONGOPASS")
+		instance = &DbService{connectionLink: fmt.Sprintf(mongoLink, password)}
 	}
 
 	return instance, nil
@@ -60,29 +48,22 @@ func NewDBService() (*DbService, error) {
 
 func MongoClient() *mongo.Collection {
 
-	content, err := os.ReadFile(passwordFile)
+	password := os.Getenv("MONGOPASS")
+
+	mongoOptions := options.Client().ApplyURI(fmt.Sprintf(mongoLink, password))
+	client, err := mongo.NewClient(mongoOptions)
 	if err != nil {
 		return nil
 	}
-	var password map[string]string
-	err = json.Unmarshal(content, &password)
-	if err == nil {
 
-		mongoOptions := options.Client().ApplyURI(fmt.Sprintf(mongoLink, password["password"]))
-		client, err := mongo.NewClient(mongoOptions)
-		if err != nil {
-			return nil
-		}
-
-		if err := client.Connect(context.Background()); err != nil {
-			return nil
-		}
-
-		c := client.Database("Messenger").Collection("sessions")
-
-		return c
+	if err := client.Connect(context.Background()); err != nil {
+		return nil
 	}
-	return nil
+
+	c := client.Database("Messenger").Collection("sessions")
+
+	return c
+
 }
 
 // connect connects to the DB
@@ -152,6 +133,10 @@ func (dbs DbService) CheckGroup(user *user.User, to []*user.User) (ID primitive.
 	var groupID any
 	var ok bool
 	user.LeaveMinimalInformation()
+	for _, us := range to {
+		us.LeaveMinimalInformation()
+	}
+
 	err = dbs.connect()
 	if err == nil {
 		groupID, err = dbgroup.CheckGroup(user, to, dbs.dbclient, dbs.dbcontext)
@@ -166,20 +151,46 @@ func (dbs DbService) CheckGroup(user *user.User, to []*user.User) (ID primitive.
 	return
 }
 
-// CheckGroup creates a new one
-func (dbs DbService) CreateGroup(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
+// CreateGroupByUsers creates a new one using users
+func (dbs DbService) CreateGroupByUsers(user *user.User, to []*user.User) (ID primitive.ObjectID, err error) {
 	var groupID any
 	var ok bool
-	user.UserName = ""
-	user.Password = ""
-	user.State = ""
+	user.LeaveMinimalInformation()
+	for _, v := range to {
+		v.LeaveMinimalInformation()
+	}
 	err = dbs.connect()
 	if err == nil {
-		groupID, err = dbgroup.CreateGroup(user, to, dbs.dbclient, dbs.dbcontext)
+		groupID, err = dbgroup.CreateGroupByUsers(user, to, dbs.dbclient, dbs.dbcontext)
 		if err == nil {
 			ID, ok = groupID.(primitive.ObjectID)
 			if !ok {
 				err = errors.New("it has occured a problem parsing group ID")
+			}
+		}
+	}
+	dbs.close()
+	return
+}
+
+// CheckGroup creates a new one
+func (dbs DbService) CreateGroup(ingroup *group.Group) (ouputGroup *group.Group, err error) {
+	var groupID any
+	var ok bool
+	var ID primitive.ObjectID
+	for _, v := range ingroup.Members {
+		v.LeaveMinimalInformation()
+	}
+	ingroup.ID = nil
+	err = dbs.connect()
+	if err == nil {
+		groupID, err = dbgroup.CreateGroup(ingroup, dbs.dbclient, dbs.dbcontext)
+		if err == nil {
+			ID, ok = groupID.(primitive.ObjectID)
+			if !ok {
+				err = errors.New("it has occured a problem parsing group ID")
+			} else {
+				ouputGroup, err = dbgroup.GetGroup(ID, dbs.dbclient, dbs.dbcontext)
 			}
 		}
 	}
@@ -247,5 +258,15 @@ func (dbs DbService) UpdateMessageReadBy(messageID primitive.ObjectID, localUser
 		}
 	}
 	dbs.close()
+	return
+}
+
+// UpdateUser updates user in the mongoDB
+func (dbs *DbService) UpdateUser(user *user.User) (err error) {
+	err = dbs.connect()
+	if err == nil {
+		err = dbuser.UpdateUser(user, dbs.dbclient, dbs.dbcontext)
+	}
+
 	return
 }

@@ -7,6 +7,7 @@ import (
 	"MessengerService/message"
 	"MessengerService/user"
 	"MessengerService/usermanager"
+	"errors"
 	"sync"
 	"time"
 
@@ -60,9 +61,13 @@ func (ms *messengerManager) FakeLogin(user user.User, token string) (err error) 
 
 // Login check user credentials to return a new token
 func (ms *messengerManager) Login(user user.User) (token string, err error) {
+
 	ok, err := ms.userManager.Login(user)
 	if ok != nil && err == nil {
-		token, err = ms.userManager.GenerateToken(ok)
+		if token = ms.userManager.HasTokenAccess(*ok); token == "" {
+			token, err = ms.userManager.GenerateToken(ok)
+		}
+
 	}
 	return
 }
@@ -80,8 +85,17 @@ func (ms *messengerManager) CheckGroup(user user.User, to []*user.User) (groupID
 }
 
 // CreateGroup create a new group in the DB
-func (ms *messengerManager) CreateGroup(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
-	groupID, err = ms.groupManager.CreateGroup(user, to)
+func (ms *messengerManager) CreateGroupByUsers(user user.User, to []*user.User) (groupID primitive.ObjectID, err error) {
+	groupID, err = ms.groupManager.CreateGroupByUsers(user, to)
+	return
+}
+
+// CreateGroup create a new group in the DB
+func (ms *messengerManager) CreateGroup(group *group.Group) (ouputGroup *group.Group, err error) {
+	if len(group.Members) < 2 {
+		return nil, errors.New("to create a new chat must be almost two users")
+	}
+	ouputGroup, err = ms.groupManager.CreateGroup(group)
 	return
 }
 
@@ -145,4 +159,22 @@ func (ms *messengerManager) MapNumberToSocketID(user *user.User) *socket.SocketI
 func (ms *messengerManager) GetUser(user user.User) (returneduser *user.User, err error) {
 	returneduser, err = ms.userManager.GetUser(user)
 	return
+}
+
+// ResetUserTime resets the user ticker time
+func (ms *messengerManager) ResetUserTime(token string) error {
+	return ms.userManager.ResetTicker(token)
+}
+
+// MapUsersToSocketsID maps a users into socketsID list
+func (ms *messengerManager) MapUsersToSocketsID(users []*user.User) map[socket.SocketId]bool {
+	var numbers []string
+	for _, us := range users {
+		numbers = append(numbers, us.Zone+us.Number)
+	}
+	return ms.userManager.MapNumbersToSocketID(numbers)
+}
+
+func (ms *messengerManager) UpdateUser(user *user.User) error {
+	return ms.userManager.UpdateUser(user)
 }

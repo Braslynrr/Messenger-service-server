@@ -13,6 +13,7 @@ type User struct {
 	State    string          `bson:"state,omitempty" json:"state,omitempty"`
 	UserName string          `bson:"username,omitempty" json:"username,omitempty"`
 	Password string          `bson:"password,omitempty" json:"password,omitempty"`
+	Url      string          `bson:"url,omitempty" json:"url"`
 	socket   socket.SocketId `bson:"-" json:"-"`
 }
 
@@ -81,4 +82,5 @@ func (user *User) LeaveMinimalInformation() {
 	user.Password = ""
 	user.State = ""
 	user.UserName = ""
+	user.Url = ""
 }

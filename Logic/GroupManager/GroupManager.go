@@ -31,8 +31,14 @@ func (gm *GroupManager) CheckGroup(user user.User, to []*user.User) (ID primitiv
 }
 
 // CreateGroup  create a new group
-func (gm *GroupManager) CreateGroup(user user.User, to []*user.User) (ID primitive.ObjectID, err error) {
-	ID, err = gm.dbservice.CreateGroup(&user, to)
+func (gm *GroupManager) CreateGroupByUsers(user user.User, to []*user.User) (ID primitive.ObjectID, err error) {
+	ID, err = gm.dbservice.CreateGroupByUsers(&user, to)
+	return
+}
+
+// CreateGroup  create a new group
+func (gm *GroupManager) CreateGroup(group *group.Group) (outputGroup *group.Group, err error) {
+	outputGroup, err = gm.dbservice.CreateGroup(group)
 	return
 }
 

@@ -26,14 +26,17 @@ func main() {
 		store := mongodriver.NewStore(client, 3600, true, []byte("secret"))
 
 		ms := messengerserviceapi.MessengerService{
-			Sender:    make(chan *messengerserviceapi.SocketMessage, 100),
-			ErrorChan: make(chan messengerserviceapi.SocketError, 100),
-			DoneChan:  make(chan bool),
-			Wait:      &sync.WaitGroup{},
-			Logger:    logger,
-			ErrorLog:  logerror,
-			DbService: DB,
-			Sesion:    sessions.Sessions("key", store),
+			MessageSender:   make(chan *messengerserviceapi.SocketMessage, 100),
+			MessageDoneChan: make(chan bool),
+			ErrorChan:       make(chan messengerserviceapi.SocketError, 100),
+			ErrorDoneChan:   make(chan bool),
+			NotifyChan:      make(chan *messengerserviceapi.GeneralNotification),
+			NotifyDoneChan:  make(chan bool),
+			Wait:            &sync.WaitGroup{},
+			Logger:          logger,
+			ErrorLog:        logerror,
+			DbService:       DB,
+			Sesion:          sessions.Sessions("key", store),
 		}
 
 		router, err = ms.SetupServer(false)

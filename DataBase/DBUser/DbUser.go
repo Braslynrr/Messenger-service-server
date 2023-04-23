@@ -46,3 +46,20 @@ func Login(localuser user.User, client *mongo.Client, ctx context.Context) (user
 	}
 	return nil, err
 }
+
+// UpdateUser updates an user
+func UpdateUser(localuser *user.User, client *mongo.Client, ctx context.Context) (err error) {
+	collection := client.Database("Messenger").Collection("Messenger")
+
+	filters := bson.D{{Key: "number", Value: localuser.Number}, {Key: "zone", Value: localuser.Zone}}
+
+	update := [4]bson.M{
+		{"$set": bson.M{"state": localuser.State}},
+		{"$set": bson.M{"password": localuser.Password}},
+		{"$set": bson.M{"username": localuser.UserName}},
+		{"$set": bson.M{"url": localuser.Url}},
+	}
+	_, err = collection.UpdateOne(ctx, filters, update)
+
+	return
+}

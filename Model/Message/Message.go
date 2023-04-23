@@ -8,13 +8,13 @@ import (
 )
 
 type Message struct {
-	ID       primitive.ObjectID `bson:"_id,omitempty" json:",omitempty"`
-	GroupID  primitive.ObjectID `json:"groupID,omitempty"`
-	From     *user.User
-	Content  string
-	ReadBy   map[string]*time.Time `json:",omitempty"`
-	IsRead   bool                  `bson:"-"`
-	SentDate time.Time
+	ID       primitive.ObjectID    `bson:"_id,omitempty" json:"ID,omitempty"`
+	GroupID  primitive.ObjectID    `json:"groupID,omitempty"`
+	From     *user.User            `json:"from"`
+	Content  string                `json:"content"`
+	ReadBy   map[string]*time.Time `json:"readBy,omitempty"`
+	IsRead   bool                  `bson:"-" json:"isRead"`
+	SentDate time.Time             `json:"sentDate"`
 }
 
 // NewMessage creates a new message
