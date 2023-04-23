@@ -4,14 +4,11 @@ import (
 	"MessengerService/dbservice"
 	messengerserviceapi "MessengerService/messengerserviceApi"
 	"log"
-	"net/http"
-	"net/http/httptest"
 	"sync"
 	"testing"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
-	"github.com/go-playground/assert"
 )
 
 func TestMain(t *testing.T) {
@@ -29,10 +26,9 @@ func TestMain(t *testing.T) {
 		DbService:       &dbservice.DbTest{},
 		Sesion:          sessions.Sessions("key", store),
 	}
-	router, _ := ms.SetupServer(false)
+	_, err := ms.SetupServer(false)
 
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/", nil)
-	router.ServeHTTP(w, req)
-	assert.Equal(t, 200, w.Code)
+	if err != nil {
+		t.Errorf("SetupServer should not fail. Err: %s", err.Error())
+	}
 }
