@@ -30,7 +30,7 @@ func main() {
 			MessageDoneChan: make(chan bool),
 			ErrorChan:       make(chan messengerserviceapi.SocketError, 100),
 			ErrorDoneChan:   make(chan bool),
-			NotifyChan:      make(chan *messengerserviceapi.GeneralNotification),
+			NotifyChan:      make(chan *messengerserviceapi.GeneralNotification, 100),
 			NotifyDoneChan:  make(chan bool),
 			Wait:            &sync.WaitGroup{},
 			Logger:          logger,
