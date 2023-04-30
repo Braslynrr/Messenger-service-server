@@ -5,7 +5,6 @@ go 1.20
 require (
 	github.com/gin-contrib/sessions v0.0.5
 	github.com/gin-gonic/gin v1.9.0
-	github.com/go-playground/assert v1.2.1
 )
 
 require (

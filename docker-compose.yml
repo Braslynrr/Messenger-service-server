@@ -1,0 +1,31 @@
+version: '1.0'
+
+services:
+  back-service:
+    build:
+      context: ./
+      dockerfile: ./Endpoint/main/Back.dockerfile
+    hostname: BackEnd
+    restart: always
+    ports:
+      - "8080:8080"
+    deploy:
+      mode: replicated
+      replicas: 1
+    environment:
+      MONGOPASS:  pass
+
+  micro-service:
+    build:
+      context: ./
+      dockerfile: ./Micro/MicroBlob/micro.dockerfile
+    hostname: Micro
+    restart: always
+    ports:
+      - "5000:5000"
+    deploy:
+      mode: replicated
+      replicas: 1
+    environment:
+      AZUREACCOUNTKEY: key
+      AZUREACCOUNTNAME: service

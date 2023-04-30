@@ -2,14 +2,17 @@ BINARY_NAME=MessengerService.exe
 MICRO_NAME=MicroBlob.exe
 ## build: builds all binaries
 
-
 build_MicroBlob:
 	@go build -o ./Micro/MicroBlob/${MICRO_NAME} ./Micro/MicroBlob
 	@echo Micro blob built!
 
+docker_build:
+	@docker-compose up --build -d
+	@echo DockerImage Built
 
 build_Micro: build_MicroBlob
 
+build: build_Micro build_front build_server docker_build
 
 build_front:
 	@cd ServerFiles\messenger-ui && yarn build

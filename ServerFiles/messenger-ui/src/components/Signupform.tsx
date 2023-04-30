@@ -101,7 +101,7 @@ function SignUpForm(){
           onClick={SingUp}>
              <svg className="animate-spin h-2 w-2 mr-1 ..." viewBox="0 0 24 24">
              </svg>
-             Sign In
+             Sign Up
           </button>
 
         </div>
