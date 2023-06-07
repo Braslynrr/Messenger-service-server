@@ -10,12 +10,24 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/mongo/mongodriver"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+
+	/*
+		Just the file name when the main.go is in the root, if not, set the directory /local.env.
+		for mor references go to https://github.com/joho/godotenv
+	*/
+
+	err := godotenv.Load("local.env")
+
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+
 	var DB *dbservice.DbService
 	var router *gin.Engine
-	var err error
 	DB, err = dbservice.NewDBService()
 	logger := log.New(os.Stdout, "Info\t", log.Ldate|log.Ltime)
 	logerror := log.New(os.Stdout, "Error\t", log.Ldate|log.Ltime|log.Lshortfile)
