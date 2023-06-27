@@ -26,12 +26,12 @@ jobs:
         username: ${{ secrets.AzureAppService_ContainerUsername_64fcf5d789fb4dfdac7bf3799c6b52c2 }}
         password: ${{ secrets.AzureAppService_ContainerPassword_f708c4f4211a495ba8015c7a814e0314 }}
 
-    - name: Build and push container image to registry
-      uses: docker/build-push-action@v3
+    - name: Run Docker Compose
+      uses: docker/compose-cli-action@v0.10.1
       with:
-        push: true
-        tags: index.docker.io/${{ secrets.AzureAppService_ContainerUsername_64fcf5d789fb4dfdac7bf3799c6b52c2 }}/messengerservice:${{ github.sha }}
-        file: ./Dockerfile
+        compose-file: ./docker-compose.yml
+        context: .
+        command: up -d
 
   deploy:
     runs-on: ubuntu-latest
