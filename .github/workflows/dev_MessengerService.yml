@@ -23,14 +23,14 @@ jobs:
       uses: docker/login-action@v2
       with:
         registry: https://index.docker.io/v1/
-        username: ${{ secrets.AzureAppService_ContainerUsername_5e0a110f08e147b0a199b4aebd3404d3 }}
-        password: ${{ secrets.AzureAppService_ContainerPassword_a677b7f889c34dd898b0f7b2f37f4d51 }}
+        username: ${{ secrets.AzureAppService_ContainerUsername_40e67d8bb4d04a5aa767fd8cd923c330 }}
+        password: ${{ secrets.AzureAppService_ContainerPassword_bc7ae9c823fb4319a8f0de0974c963c5 }}
 
     - name: Build and push container image to registry
       uses: docker/build-push-action@v3
       with:
         push: true
-        tags: index.docker.io/${{ secrets.AzureAppService_ContainerUsername_5e0a110f08e147b0a199b4aebd3404d3 }}/MessengerService:${{ github.sha }}
+        tags: index.docker.io/${{ secrets.AzureAppService_ContainerUsername_40e67d8bb4d04a5aa767fd8cd923c330 }}/braslyn/messengerservice:${{ github.sha }}
         file: ./Dockerfile
 
   deploy:
@@ -47,5 +47,5 @@ jobs:
       with:
         app-name: 'MessengerService'
         slot-name: 'production'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_e6f392ac56c3456a81ebcacb98f33d09 }}
-        images: 'index.docker.io/${{ secrets.AzureAppService_ContainerUsername_5e0a110f08e147b0a199b4aebd3404d3 }}/MessengerService:${{ github.sha }}'
+        publish-profile: ${{ secrets.AzureAppService_PublishProfile_439405fb12344c4d9ff0240fb9025674 }}
+        images: 'index.docker.io/${{ secrets.AzureAppService_ContainerUsername_40e67d8bb4d04a5aa767fd8cd923c330 }}/braslyn/messengerservice:${{ github.sha }}'
