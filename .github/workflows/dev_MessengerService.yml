@@ -17,20 +17,20 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      uses: docker/setup-buildx-action@v2
 
     - name: Log in to registry
-      uses: docker/login-action@v1
+      uses: docker/login-action@v2
       with:
         registry: https://index.docker.io/v1/
-        username: ${{ secrets.AzureAppService_ContainerUsername_3f1ee7566e0c43c495a453f250ce8d80 }}
-        password: ${{ secrets.AzureAppService_ContainerPassword_435655dc3fb847cda7238805ff82a1eb }}
+        username: ${{ secrets.AzureAppService_ContainerUsername_5e0a110f08e147b0a199b4aebd3404d3 }}
+        password: ${{ secrets.AzureAppService_ContainerPassword_a677b7f889c34dd898b0f7b2f37f4d51 }}
 
     - name: Build and push container image to registry
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v3
       with:
         push: true
-        tags: index.docker.io/${{ secrets.AzureAppService_ContainerUsername_3f1ee7566e0c43c495a453f250ce8d80 }}/messenger:${{ github.sha }}
+        tags: index.docker.io/${{ secrets.AzureAppService_ContainerUsername_5e0a110f08e147b0a199b4aebd3404d3 }}/MessengerService:${{ github.sha }}
         file: ./Dockerfile
 
   deploy:
@@ -47,5 +47,5 @@ jobs:
       with:
         app-name: 'MessengerService'
         slot-name: 'production'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_3ae4bfbfc3064b7b913c5e8e16449239 }}
-        images: 'index.docker.io/${{ secrets.AzureAppService_ContainerUsername_3f1ee7566e0c43c495a453f250ce8d80 }}/messenger:${{ github.sha }}'
+        publish-profile: ${{ secrets.AzureAppService_PublishProfile_e6f392ac56c3456a81ebcacb98f33d09 }}
+        images: 'index.docker.io/${{ secrets.AzureAppService_ContainerUsername_5e0a110f08e147b0a199b4aebd3404d3 }}/MessengerService:${{ github.sha }}'
