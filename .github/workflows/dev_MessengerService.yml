@@ -27,11 +27,10 @@ jobs:
         password: ${{ secrets.AzureAppService_ContainerPassword_f708c4f4211a495ba8015c7a814e0314 }}
 
     - name: Run Docker Compose
-      uses: docker/compose-cli-action@v0.10.1
+      uses: actions/checkout@v2
       with:
-        compose-file: ./docker-compose.yml
+        run: docker-compose -f docker-compose.yml up -d
         context: .
-        command: up -d
 
   deploy:
     runs-on: ubuntu-latest
