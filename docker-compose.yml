@@ -1,4 +1,4 @@
-version: '1.0'
+version: '3'
 
 services:
   back-service:
@@ -13,7 +13,7 @@ services:
       mode: replicated
       replicas: 1
     environment:
-      MONGOPASS:  pass
+      MONGOPASS: pass
 
   micro-service:
     build:
